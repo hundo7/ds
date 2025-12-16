@@ -1,8 +1,3 @@
--- TakoGlass v10.0 - The WindUI Killer
--- 2,847 lines of superior UI architecture
--- Author: Enhanced by Claude
--- "Anything WindUI can do, we do better"
-
 --------------------------------------------------------------------
 -- 1. SERVICES & INITIALIZATION
 --------------------------------------------------------------------
