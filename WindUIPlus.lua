@@ -944,12 +944,12 @@ function TakoGlass:CreateTab(name, icon) -- (Fix 1) Tab Icons
     tab.Sections  = {}
     local theme   = Themes[self.ThemeName]
 
-    local button = Create("TextButton", {
-        BackgroundTransparency = 1, Text = name, Font = self.Font, TextSize = 13,
-        TextColor3 = theme.Text, Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left,
-        TextPadding = UDim2.new(0, 30, 0, 0), ZIndex = 103, Parent = self.TabHolder,
-    })
-    Create("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = button })
+local button = Create("TextButton", {
+    BackgroundTransparency = 1, Text = name, Font = self.Font, TextSize = 13,
+    TextColor3 = theme.Text, Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 103, Parent = self.TabHolder,
+})
+Create("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = button })
     
     local iconLabel = Create("TextLabel", {
         BackgroundTransparency = 1, Font = ICON_FONT, Text = icon or "\u{e88e}", TextColor3 = theme.SubText,
@@ -1397,15 +1397,15 @@ function TakoGlass:CreateTab(name, icon) -- (Fix 1) Tab Icons
             local row, label = GetRow(name, tooltip, isLocked)
             row.Size = UDim2.new(1, 0, 0, 28)
 
-            local button = Create("TextButton", {
-                BackgroundColor3 = theme.ElementBg, BackgroundTransparency = 0.05, BorderSizePixel = 0,
-                Size = UDim2.new(0.5, 0, 0, 28), AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, 0, 0.5, 0), ZIndex = 106, Parent = row,
-                Text = multi and (#selection > 0 and (#selection .. " selected") or "Select...") or state,
-                Font = self.Window.Font, TextSize = 13, TextColor3 = theme.Text,
-                TextXAlignment = Enum.TextXAlignment.Left, TextPadding = UDim2.new(0, 8, 0, 0),
-            })
-            Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = button })
+local button = Create("TextButton", {
+    BackgroundColor3 = theme.ElementBg, BackgroundTransparency = 0.05, BorderSizePixel = 0,
+    Size = UDim2.new(0.5, 0, 0, 28), AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, 0, 0.5, 0), ZIndex = 106, Parent = row,
+    Text = multi and (#selection > 0 and (#selection .. " selected") or "Select...") or state,
+    Font = self.Window.Font, TextSize = 13, TextColor3 = theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+Create("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = button })
             
             local arrow = Create("TextLabel", {
                 BackgroundTransparency = 1, Text = "\u{e5c5}", Font = ICON_FONT, TextSize = 16,
@@ -1450,13 +1450,14 @@ function TakoGlass:CreateTab(name, icon) -- (Fix 1) Tab Icons
                 local function AddItem(optionText)
                     local isSelected = multi and table.find(selection, optionText) or selection[1] == optionText
                     
-                    local optionButton = Create("TextButton", {
-                        BackgroundTransparency = isSelected and 0.9 or 1, BackgroundColor3 = theme.Accent,
-                        Size = UDim2.new(1, 0, 0, 24), ZIndex = 201, Parent = scroll,
-                        Text = optionText, Font = self.Window.Font, TextSize = 13,
-                        TextColor3 = isSelected and theme.Text or theme.SubText,
-                        TextXAlignment = Enum.TextXAlignment.Left, TextPadding = UDim2.new(0, 8, 0, 0),
-                    })
+local optionButton = Create("TextButton", {
+    BackgroundTransparency = isSelected and 0.9 or 1, BackgroundColor3 = theme.Accent,
+    Size = UDim2.new(1, 0, 0, 24), ZIndex = 201, Parent = scroll,
+    Text = optionText, Font = self.Window.Font, TextSize = 13,
+    TextColor3 = isSelected and theme.Text or theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+Create("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = optionButton })
                     totalHeight = totalHeight + 24
                     
                     local c
@@ -1491,13 +1492,14 @@ function TakoGlass:CreateTab(name, icon) -- (Fix 1) Tab Icons
                 
                 local searchInput = nil
                 if searchable then -- Searchable (Fix 6)
-                    searchInput = Create("TextBox", {
-                        BackgroundColor3 = theme.ElementBg, BackgroundTransparency = 0.1, BorderSizePixel = 0,
-                        Size = UDim2.new(1, 0, 0, 24), ZIndex = 201, Parent = scroll,
-                        PlaceholderText = "Search...", PlaceholderColor3 = theme.SubText,
-                        Text = "", TextColor3 = theme.Text, Font = self.Window.Font, TextSize = 13,
-                        TextXAlignment = Enum.TextXAlignment.Left, TextPadding = UDim2.new(0, 8, 0, 0),
-                    })
+local searchInput = Create("TextBox", {
+    BackgroundColor3 = theme.ElementBg, BackgroundTransparency = 0.1, BorderSizePixel = 0,
+    Size = UDim2.new(1, 0, 0, 24), ZIndex = 201, Parent = scroll,
+    PlaceholderText = "Search...", PlaceholderColor3 = theme.SubText,
+    Text = "", TextColor3 = theme.Text, Font = self.Window.Font, TextSize = 13,
+    TextXAlignment = Enum.TextXAlignment.Left,
+})
+Create("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = searchInput })
                     Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = searchInput })
                     totalHeight = totalHeight + 24 + list.Padding.Offset
                 end
