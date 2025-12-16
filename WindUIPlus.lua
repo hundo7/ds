@@ -1,11 +1,75 @@
---// TakoGlass UI v3
---  Glass-style UI with:
---   - Configurable blur from script (or disabled)
---   - Smooth “4K-ish” card look (tighter borders, less fog)
---   - Window:SetToggleKey(Enum.KeyCode.H)
---   - Window:SetBlur(enabled, size)
---   - Script-configurable options & themes
---   - Notifications only (no prints)
+--[[
+
+    TakoGlass UI (Refined Single-File Version)
+
+    API (same as you requested):
+
+        local TakoGlass = loadstring(game:HttpGet("..."))()
+
+        local window = TakoGlass:CreateWindow({
+            Title        = "Nexus Hub",
+            SubTitle     = "by 16Takoo (fixed & fully restored)",
+            ConfigName   = "MySuperHub",
+            Theme        = "Dark",           -- "Dark" | "Light"
+            Size         = UDim2.fromOffset(580, 460),
+            SidebarWidth = 200,
+            Transparent  = true,
+            UseBlur      = false,
+            BlurSize     = 18,
+        })
+
+        window:SetToggleKey(Enum.KeyCode.H)        -- to hide/show UI
+        window:SetBlur(true, 18)                   -- enable / change blur at runtime
+        window:SetTheme("Light")                   -- or "Dark"
+
+        local tab = window:CreateTab("Main")
+        local section = tab:CreateSection("Speed para 70","Da 70 de speed walkspeed")
+
+        section:AddToggle({
+            Name     = "Enable",
+            Flag     = "SpeedEnable",
+            Default  = false,
+            Callback = function(value) end
+        })
+
+        section:AddSlider({
+            Name     = "Speed",
+            Min      = 0,
+            Max      = 100,
+            Default  = 70,
+            Step     = 1,       -- optional (float allowed)
+            Flag     = "SpeedValue",
+            Callback = function(value) end
+        })
+
+        section:AddDropdown({
+            Name     = "Mode",
+            Options  = {"A","B","C"},
+            Default  = "A",
+            Flag     = "ModeFlag",
+            Callback = function(value) end
+        })
+
+        section:AddInput({
+            Name        = "Custom",
+            Default     = "",
+            Placeholder = "Type here",
+            Flag        = "CustomInput",
+            Callback    = function(text, enterPressed) end
+        })
+
+        section:AddButton({
+            Name     = "Do Something",
+            Callback = function() end
+        })
+
+        TakoGlass.Notify("Title","Message",4)
+
+]]
+
+-------------------------------------------------
+-- Services
+-------------------------------------------------
 
 local Players          = game:GetService("Players")
 local TweenService     = game:GetService("TweenService")
@@ -13,420 +77,472 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService      = game:GetService("HttpService")
 local Lighting         = game:GetService("Lighting")
 
-local LocalPlayer      = Players.LocalPlayer
+local LocalPlayer      = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+-------------------------------------------------
+-- Root table
+-------------------------------------------------
 
 local TakoGlass = {}
 TakoGlass.__index = TakoGlass
 
 -------------------------------------------------
--- Config / Defaults
+-- Config
 -------------------------------------------------
 
-local CONFIG_FOLDER = "TakoGlassConfigs"
+local CONFIG_FOLDER   = "TakoGlassConfigs"
+local DEFAULT_THEME   = "Dark"
+local NOTIFY_ZINDEX   = 100
 
-local DefaultTheme = {
-    Name        = "Default",
-    Accent      = Color3.fromRGB(95, 140, 255),
-    Background  = Color3.fromRGB(12, 12, 18),
-    Outline     = Color3.fromRGB(80, 80, 110),
-    Text        = Color3.fromRGB(235, 235, 245),
-    Placeholder = Color3.fromRGB(150, 150, 170),
-    Button      = Color3.fromRGB(26, 26, 36),
-    Icon        = Color3.fromRGB(210, 210, 220),
+local Themes = {
+    Dark = {
+        Name        = "Dark",
+        WindowBg    = Color3.fromRGB(14, 14, 22),
+        WindowAlpha = 0.12,
+        CardBg      = Color3.fromRGB(24, 24, 36),
+        ElementBg   = Color3.fromRGB(32, 32, 46),
+        SidebarBg   = Color3.fromRGB(16, 16, 26),
+
+        Accent      = Color3.fromRGB(102, 140, 255),
+        AccentSoft  = Color3.fromRGB(72, 110, 220),
+
+        Text        = Color3.fromRGB(240, 240, 250),
+        SubText     = Color3.fromRGB(155, 160, 185),
+
+        StrokeSoft  = Color3.fromRGB(70, 70, 95),
+    },
+
+    Light = {
+        Name        = "Light",
+        WindowBg    = Color3.fromRGB(245, 247, 255),
+        WindowAlpha = 0.06,
+        CardBg      = Color3.fromRGB(252, 252, 255),
+        ElementBg   = Color3.fromRGB(238, 241, 255),
+        SidebarBg   = Color3.fromRGB(234, 238, 255),
+
+        Accent      = Color3.fromRGB(80, 130, 255),
+        AccentSoft  = Color3.fromRGB(60, 105, 230),
+
+        Text        = Color3.fromRGB(24, 26, 40),
+        SubText     = Color3.fromRGB(105, 110, 140),
+
+        StrokeSoft  = Color3.fromRGB(200, 205, 230),
+    }
 }
 
 -------------------------------------------------
 -- Helpers
 -------------------------------------------------
 
-local function Create(class, props)
-    local obj = Instance.new(class)
-    for k, v in pairs(props or {}) do
+local function Create(instanceType, properties)
+    local obj = Instance.new(instanceType)
+    for k, v in pairs(properties or {}) do
         obj[k] = v
     end
     return obj
 end
 
-local function DoTween(obj, goal, time, style, dir)
-    if not obj then return end
-    local tweenInfo = TweenInfo.new(
-        time or 0.18,
-        style or Enum.EasingStyle.Quad,
-        dir or Enum.EasingDirection.Out
-    )
-    TweenService:Create(obj, tweenInfo, goal):Play()
+local function Ease(instance, goalProps, duration)
+    if not instance then return end
+    local tweenInfo = TweenInfo.new(duration or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    TweenService:Create(instance, tweenInfo, goalProps):Play()
 end
 
-local function EnsureFolder()
+local function EnsureConfigFolder()
     if not isfolder or not makefolder then return end
     if not isfolder(CONFIG_FOLDER) then
         makefolder(CONFIG_FOLDER)
     end
 end
 
-local function SaveConfig(name, data)
+local function SaveConfig(configName, data)
     if not writefile then return end
-    EnsureFolder()
-    local path = CONFIG_FOLDER .. "/" .. name .. ".json"
+    EnsureConfigFolder()
+    local path = ("%s/%s.json"):format(CONFIG_FOLDER, configName)
     writefile(path, HttpService:JSONEncode(data))
 end
 
-local function LoadConfig(name)
+local function LoadConfig(configName)
     if not readfile or not isfile then return {} end
-    local path = CONFIG_FOLDER .. "/" .. name .. ".json"
+    local path = ("%s/%s.json"):format(CONFIG_FOLDER, configName)
     if not isfile(path) then return {} end
     local ok, decoded = pcall(function()
         return HttpService:JSONDecode(readfile(path))
     end)
-    return ok and decoded or {}
+    if not ok or type(decoded) ~= "table" then
+        return {}
+    end
+    return decoded
 end
 
--------------------------------------------------
--- Blur control (per window)
--------------------------------------------------
-
-local function getOrCreateBlur()
+local function GetOrCreateBlur()
     local blur = Lighting:FindFirstChild("TakoGlassBlur")
     if not blur then
         blur = Instance.new("BlurEffect")
         blur.Name = "TakoGlassBlur"
         blur.Enabled = false
-        blur.Size = 12
         blur.Parent = Lighting
     end
     return blur
 end
 
 -------------------------------------------------
--- Notifications
+-- Notification system (instance-agnostic)
 -------------------------------------------------
 
-function TakoGlass.Notify(title, text, duration)
-    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not pg then return end
+local function GetNotifyGui()
+    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not playerGui then return nil end
 
-    local gui = pg:FindFirstChild("TakoGlass_Notify")
-    if not gui then
-        gui = Create("ScreenGui", {
-            Name = "TakoGlass_Notify",
-            ResetOnSpawn = false,
-            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-            Parent = pg
-        })
-        local holder = Create("Frame", {
-            Name = "Holder",
-            AnchorPoint = Vector2.new(1, 1),
-            Position = UDim2.new(1, -24, 1, -24),
-            Size = UDim2.new(0, 320, 1, -48),
-            BackgroundTransparency = 1,
-            Parent = gui
-        })
-        Create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Vertical,
-            HorizontalAlignment = Enum.HorizontalAlignment.Right,
-            VerticalAlignment = Enum.VerticalAlignment.Bottom,
-            Padding = UDim.new(0, 6),
-            Parent = holder
-        })
-    end
+    local gui = playerGui:FindFirstChild("TakoGlass_Notify")
+    if gui then return gui end
 
-    local theme = DefaultTheme
+    gui = Create("ScreenGui", {
+        Name = "TakoGlass_Notify",
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    })
+    gui.Parent = playerGui
+
+    local holder = Create("Frame", {
+        Name = "Holder",
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.new(1, -24, 1, -24),
+        Size = UDim2.new(0, 320, 1, -48),
+        BackgroundTransparency = 1,
+    })
+    holder.Parent = gui
+
+    local layout = Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Vertical,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        Padding = UDim.new(0, 6),
+    })
+    layout.Parent = holder
+
+    return gui
+end
+
+function TakoGlass.Notify(title, message, duration)
+    local gui = GetNotifyGui()
+    if not gui then return end
+
     local holder = gui:FindFirstChild("Holder")
+    if not holder then return end
+
+    local theme = Themes[DEFAULT_THEME]
 
     local card = Create("Frame", {
-        BackgroundColor3 = theme.Button,
-        BackgroundTransparency = 0.05,
+        BackgroundColor3 = theme.CardBg,
+        BackgroundTransparency = 0.04,
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 0),
-        Parent = holder
+        ZIndex = NOTIFY_ZINDEX,
     })
-    card.ZIndex = 20
+    card.Parent = holder
 
     Create("UICorner", { CornerRadius = UDim.new(0, 10), Parent = card })
     Create("UIStroke", {
-        Color = theme.Outline,
+        Color = theme.StrokeSoft,
         Thickness = 1,
         Transparency = 0.35,
-        Parent = card
+        Parent = card,
     })
     Create("UIPadding", {
         PaddingTop = UDim.new(0, 8),
         PaddingBottom = UDim.new(0, 8),
-        PaddingLeft = UDimnew(0, 10),
+        PaddingLeft = UDim.new(0, 10),
         PaddingRight = UDim.new(0, 10),
-        Parent = card
+        Parent = card,
     })
 
-    Create("TextLabel", {
-        Text = title or "Notification",
+    local titleLabel = Create("TextLabel", {
+        BackgroundTransparency = 1,
         Font = Enum.Font.GothamSemibold,
-        TextSize = 14,
+        Text = title or "Notification",
         TextColor3 = theme.Text,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 18),
+        TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = card
+        Size = UDim2.new(1, 0, 0, 18),
+        ZIndex = NOTIFY_ZINDEX + 1,
     })
+    titleLabel.Parent = card
 
-    Create("TextLabel", {
-        Text = text or "",
-        Font = Enum.Font.Gotham,
-        TextSize = 13,
-        TextColor3 = theme.Placeholder,
+    local body = Create("TextLabel", {
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 0, 0, 18),
-        Size = UDim2.new(1, 0, 0, 36),
+        Font = Enum.Font.Gotham,
+        Text = message or "",
+        TextColor3 = theme.SubText,
+        TextSize = 13,
         TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top,
-        Parent = card
+        Position = UDim2.new(0, 0, 0, 18),
+        Size = UDim2.new(1, 0, 0, 0),
+        ZIndex = NOTIFY_ZINDEX + 1,
     })
+    body.Parent = card
 
-    DoTween(card, { Size = UDim2.new(1, 0, 0, 70) }, 0.2)
-    task.spawn(function()
-        task.wait(duration or 4)
-        DoTween(card, { Size = UDim2.new(1, 0, 0, 0) }, 0.2)
-        task.wait(0.2)
-        card:Destroy()
+    -- Auto-height based on text bounds
+    task.delay(0.03, function()
+        local bounds = body.TextBounds
+        local totalHeight = 18 + bounds.Y + 8
+        Ease(card, { Size = UDim2.new(1, 0, 0, totalHeight) }, 0.18)
+        body.Size = UDim2.new(1, 0, 0, bounds.Y)
     end)
+
+    local alive = true
+    local function close()
+        if not alive then return end
+        alive = false
+        Ease(card, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, 0.15)
+        task.delay(0.18, function()
+            if card then card:Destroy() end
+        end)
+    end
+
+    card.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            close()
+        end
+    end)
+
+    task.delay(duration or 4, close)
 end
 
 -------------------------------------------------
--- Window constructor
+-- Window creation
 -------------------------------------------------
 
-function TakoGlass:CreateWindow(opts)
+function TakoGlass:CreateWindow(options)
+    options = options or {}
+
     local self = setmetatable({}, TakoGlass)
 
-    opts = opts or {}
+    self.Title        = options.Title or "UI Title"
+    self.SubTitle     = options.SubTitle or ""
+    self.ConfigName   = options.ConfigName or self.Title
+    self.ThemeName    = options.Theme or DEFAULT_THEME
+    self.Size         = options.Size or UDim2.fromOffset(580, 460)
+    self.SidebarWidth = options.SidebarWidth or 200
+    self.Transparent  = (options.Transparent ~= nil) and options.Transparent or true
 
-    self.Title        = opts.Title or "Nexus Hub"
-    self.IconName     = opts.Icon or nil
-    self.Author       = opts.Author or ""
-    self.Folder       = opts.Folder or self.Title
-    self.Size         = opts.Size or UDim2.fromOffset(580, 460)
-    self.Transparent  = (opts.Transparent ~= nil) and opts.Transparent or true
-    self.Resizable    = (opts.Resizable ~= nil) and opts.Resizable or false -- flag only
-    self.SideBarWidth = opts.SideBarWidth or 200
-    self.Theme        = opts.Theme or table.clone(DefaultTheme)
+    self.UseBlur      = (options.UseBlur ~= nil) and options.UseBlur or false
+    self.BlurSize     = options.BlurSize or 18
 
-    self.UseBlur      = (opts.UseBlur ~= nil) and opts.UseBlur or false
-    self.BlurSize     = opts.BlurSize or 14
-
-    self.ConfigName   = self.Folder
     self.Flags        = {}
     self.Config       = LoadConfig(self.ConfigName)
+    if self.Config.__Theme and Themes[self.Config.__Theme] then
+        self.ThemeName = self.Config.__Theme
+    end
 
+    self.Tabs         = {}
+    self.Elements     = {}    -- flat list of elements for theme re‑apply
     self.ToggleKey    = Enum.KeyCode.RightShift
     self.IsOpen       = true
     self.IsMinimized  = false
 
-    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not pg then error("No PlayerGui") end
+    local theme = Themes[self.ThemeName]
+    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    assert(playerGui, "PlayerGui not found")
 
-    local blur = getOrCreateBlur()
-    self.BlurObject = blur
-    if self.UseBlur then
-        blur.Size = self.BlurSize
-        blur.Enabled = true
-    else
-        blur.Enabled = false
-    end
+    -- Blur
+    self.BlurObject = GetOrCreateBlur()
+    self.BlurObject.Size = self.BlurSize
+    self.BlurObject.Enabled = self.UseBlur
 
-    local gui = Create("ScreenGui", {
+    -- ScreenGui
+    local screenGui = Create("ScreenGui", {
         Name = "TakoGlass_" .. self.Title,
         ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        Parent = pg
     })
-    self.Gui = gui
+    screenGui.Parent = playerGui
+    self.Gui = screenGui
 
-    -------------------------------------------------
     -- Main window
-    -------------------------------------------------
-
     local main = Create("Frame", {
         Name = "Window",
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
         Size = self.Size,
-        BackgroundColor3 = self.Theme.Background,
-        BackgroundTransparency = self.Transparent and 0.1 or 0,
+        BackgroundColor3 = theme.WindowBg,
+        BackgroundTransparency = self.Transparent and theme.WindowAlpha or 0,
         BorderSizePixel = 0,
         ClipsDescendants = true,
-        Parent = gui
     })
-    Create("UICorner", { CornerRadius = UDim.new(0, 16), Parent = main })
+    main.Parent = screenGui
+    Create("UICorner", { CornerRadius = UDim.new(0, 14), Parent = main })
     Create("UIStroke", {
-        Color = self.Theme.Outline,
+        Color = theme.StrokeSoft,
         Thickness = 1,
-        Transparency = 0.25,
-        Parent = main
+        Transparency = 0.3,
+        Parent = main,
     })
-
     self.Main = main
 
-    -------------------------------------------------
     -- Top bar
-    -------------------------------------------------
-
-    local top = Create("Frame", {
+    local topBar = Create("Frame", {
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 44),
-        Parent = main
     })
+    topBar.Parent = main
 
     Create("UIPadding", {
-        PaddingLeft = UDim.new(0, 18),
+        PaddingLeft = UDim.new(0, 16),
         PaddingRight = UDim.new(0, 12),
-        Parent = top
+        Parent = topBar,
     })
 
     local titleLabel = Create("TextLabel", {
-        Text = self.Title,
-        Font = Enum.Font.GothamSemibold,
-        TextSize = 16,
-        TextColor3 = self.Theme.Text,
         BackgroundTransparency = 1,
+        Font = Enum.Font.GothamSemibold,
+        Text = self.Title,
+        TextColor3 = theme.Text,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
         Size = UDim2.new(0.7, 0, 0, 20),
         Position = UDim2.new(0, 0, 0, 6),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = top
     })
+    titleLabel.Parent = topBar
 
-    local authorLabel = Create("TextLabel", {
-        Text = self.Author,
-        Font = Enum.Font.Gotham,
-        TextSize = 13,
-        TextColor3 = self.Theme.Placeholder,
+    local subtitleLabel = Create("TextLabel", {
         BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = self.SubTitle,
+        TextColor3 = theme.SubText,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
         Size = UDim2.new(0.7, 0, 0, 18),
         Position = UDim2.new(0, 0, 0, 24),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = top
     })
+    subtitleLabel.Parent = topBar
 
-    self.TitleLabel  = titleLabel
-    self.AuthorLabel = authorLabel
+    self.TitleLabel   = titleLabel
+    self.SubTitleLabel= subtitleLabel
 
-    -- Minus and close buttons
-    local minusBtn = Create("TextButton", {
+    -- Minimize + close
+    local minimizeButton = Create("TextButton", {
+        BackgroundTransparency = 1,
         Text = "–",
         Font = Enum.Font.GothamBold,
         TextSize = 20,
-        TextColor3 = self.Theme.Icon,
-        BackgroundTransparency = 1,
+        TextColor3 = theme.SubText,
         Size = UDim2.new(0, 30, 1, 0),
         Position = UDim2.new(1, -64, 0, 0),
-        Parent = top
     })
+    minimizeButton.Parent = topBar
 
-    local closeBtn = Create("TextButton", {
+    local closeButton = Create("TextButton", {
+        BackgroundTransparency = 1,
         Text = "✕",
         Font = Enum.Font.GothamBold,
         TextSize = 18,
-        TextColor3 = self.Theme.Icon,
-        BackgroundTransparency = 1,
+        TextColor3 = theme.SubText,
         Size = UDim2.new(0, 30, 1, 0),
         Position = UDim2.new(1, -32, 0, 0),
-        Parent = top
     })
+    closeButton.Parent = topBar
 
-    closeBtn.MouseButton1Click:Connect(function()
-        if self.BlurObject then self.BlurObject.Enabled = false end
-        gui:Destroy()
+    closeButton.MouseButton1Click:Connect(function()
+        self.BlurObject.Enabled = false
+        screenGui:Destroy()
     end)
 
-    minusBtn.MouseButton1Click:Connect(function()
+    minimizeButton.MouseButton1Click:Connect(function()
         self.IsMinimized = not self.IsMinimized
         if self.IsMinimized then
-            DoTween(main, { Size = UDim2.new(0, self.Size.X.Offset, 0, 44) }, 0.16)
+            Ease(main, { Size = UDim2.new(0, self.Size.X.Offset, 0, 44) }, 0.16)
         else
-            DoTween(main, { Size = self.Size }, 0.16)
+            Ease(main, { Size = self.Size }, 0.16)
         end
     end)
 
-    -- Dragging
+    -- Dragging with simple bounds
     do
         local dragging = false
-        local dragStart, startPos
-        top.InputBegan:Connect(function(input)
+        local dragStart
+        local startPos
+
+        local function clampToScreen(pos)
+            local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
+            local x = math.clamp(pos.X.Offset, -viewport.X / 2, viewport.X / 2)
+            local y = math.clamp(pos.Y.Offset, -viewport.Y / 2, viewport.Y / 2)
+            return UDim2.new(0.5, x, 0.5, y)
+        end
+
+        topBar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = true
                 dragStart = input.Position
                 startPos = main.Position
             end
         end)
-        top.InputEnded:Connect(function(input)
+
+        topBar.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = false
             end
         end)
-        top.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+
+        topBar.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
                 local delta = input.Position - dragStart
-                main.Position = UDim2.new(
+                local newPos = UDim2.new(
                     startPos.X.Scale,
                     startPos.X.Offset + delta.X,
                     startPos.Y.Scale,
                     startPos.Y.Offset + delta.Y
                 )
+                main.Position = clampToScreen(newPos)
             end
         end)
     end
 
-    -------------------------------------------------
     -- Sidebar
-    -------------------------------------------------
-
     local sidebar = Create("Frame", {
-        BackgroundColor3 = self.Theme.Button,
+        BackgroundColor3 = theme.SidebarBg,
         BackgroundTransparency = 0.08,
         BorderSizePixel = 0,
         Position = UDim2.new(0, 0, 0, 44),
-        Size = UDim2.new(0, self.SideBarWidth, 1, -44),
-        Parent = main
+        Size = UDim2.new(0, self.SidebarWidth, 1, -44),
     })
-    Create("UICorner", { CornerRadius = UDim.new(0, 16), Parent = sidebar })
-
+    sidebar.Parent = main
+    Create("UICorner", { CornerRadius = UDim.new(0, 14), Parent = sidebar })
     Create("UIPadding", {
         PaddingTop = UDim.new(0, 12),
         PaddingLeft = UDim.new(0, 10),
         PaddingRight = UDim.new(0, 8),
-        Parent = sidebar
+        Parent = sidebar,
     })
-
-    local tabList = Create("UIListLayout", {
+    local tabLayout = Create("UIListLayout", {
         FillDirection = Enum.FillDirection.Vertical,
         Padding = UDim.new(0, 6),
-        Parent = sidebar
     })
+    tabLayout.Parent = sidebar
 
-    -- Content panel
+    -- Content area
     local content = Create("Frame", {
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, self.SideBarWidth, 0, 44),
-        Size = UDim2.new(1, -self.SideBarWidth, 1, -44),
-        Parent = main
+        Position = UDim2.new(0, self.SidebarWidth, 0, 44),
+        Size = UDim2.new(1, -self.SidebarWidth, 1, -44),
     })
+    content.Parent = main
 
     self.Sidebar = sidebar
-    self.TabList = sidebar
+    self.TabHolder = sidebar
     self.Content = content
-    self.Tabs    = {}
 
-    -------------------------------------------------
-    -- Global toggle key
-    -------------------------------------------------
-
-    UserInputService.InputBegan:Connect(function(input, gpe)
-        if gpe then return end
+    -- Toggle key (global, but bound to this window)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == self.ToggleKey then
             self:SetVisible(not self.IsOpen)
         end
     end)
 
-    self:SetTheme(self.Theme)
+    self:SetTheme(self.ThemeName)
 
     return self
 end
@@ -435,21 +551,18 @@ end
 -- Window methods
 -------------------------------------------------
 
-function TakoGlass:SetVisible(state)
-    if state == nil then
-        return self.IsOpen
-    end
-    self.IsOpen = state
+function TakoGlass:SetVisible(visible)
+    self.IsOpen = visible
     if self.Gui then
-        self.Gui.Enabled = state
+        self.Gui.Enabled = visible
     end
     if self.BlurObject then
-        self.BlurObject.Enabled = state and self.UseBlur or false
+        self.BlurObject.Enabled = visible and self.UseBlur or false
     end
 end
 
-function TakoGlass:SetToggleKey(keycode)
-    self.ToggleKey = keycode
+function TakoGlass:SetToggleKey(keyCode)
+    self.ToggleKey = keyCode
 end
 
 function TakoGlass:SetBlur(enabled, size)
@@ -457,37 +570,45 @@ function TakoGlass:SetBlur(enabled, size)
     if size then
         self.BlurSize = size
     end
-    local blur = self.BlurObject or getOrCreateBlur()
+    local blur = self.BlurObject or GetOrCreateBlur()
     self.BlurObject = blur
     blur.Size = self.BlurSize
-    blur.Enabled = self.UseBlur and self.IsOpen or false
+    blur.Enabled = self.UseBlur and self.IsOpen
 end
 
-function TakoGlass:SetTheme(themeTable)
-    for k, v in pairs(themeTable or {}) do
-        self.Theme[k] = v
-    end
-    local t = self.Theme
+function TakoGlass:SetTheme(themeName)
+    if not Themes[themeName] then return end
+    self.ThemeName = themeName
+    local theme = Themes[themeName]
 
     if self.Main then
-        self.Main.BackgroundColor3 = t.Background
-        self.Main.BackgroundTransparency = self.Transparent and 0.1 or 0
+        self.Main.BackgroundColor3 = theme.WindowBg
+        self.Main.BackgroundTransparency = self.Transparent and theme.WindowAlpha or 0
         local stroke = self.Main:FindFirstChildOfClass("UIStroke")
         if stroke then
-            stroke.Color = t.Outline
-            stroke.Transparency = 0.25
+            stroke.Color = theme.StrokeSoft
+            stroke.Transparency = 0.3
         end
     end
 
-    if self.TitleLabel then self.TitleLabel.TextColor3 = t.Text end
-    if self.AuthorLabel then self.AuthorLabel.TextColor3 = t.Placeholder end
-    if self.Sidebar then
-        self.Sidebar.BackgroundColor3 = t.Button
-    end
+    if self.TitleLabel then self.TitleLabel.TextColor3 = theme.Text end
+    if self.SubTitleLabel then self.SubTitleLabel.TextColor3 = theme.SubText end
+    if self.Sidebar then self.Sidebar.BackgroundColor3 = theme.SidebarBg end
 
     for _, tab in ipairs(self.Tabs) do
-        tab:ApplyTheme(t)
+        if tab.ApplyTheme then
+            tab:ApplyTheme(theme)
+        end
     end
+
+    for _, el in ipairs(self.Elements) do
+        if el.ApplyTheme then
+            el:ApplyTheme(theme)
+        end
+    end
+
+    self.Config.__Theme = themeName
+    SaveConfig(self.ConfigName, self.Config)
 end
 
 -------------------------------------------------
@@ -495,27 +616,27 @@ end
 -------------------------------------------------
 
 function TakoGlass:CreateTab(name)
-    local theme = self.Theme
+    local theme = Themes[self.ThemeName]
 
-    local btn = Create("TextButton", {
+    local button = Create("TextButton", {
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
         Text = name,
         Font = Enum.Font.Gotham,
         TextSize = 13,
-        TextColor3 = theme.Placeholder,
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
+        TextColor3 = theme.SubText,
         Size = UDim2.new(1, -4, 0, 28),
-        Parent = self.TabList
     })
+    button.Parent = self.TabHolder
 
-    local btnBg = Create("Frame", {
-        BackgroundColor3 = theme.Button,
+    local buttonBg = Create("Frame", {
+        BackgroundColor3 = theme.SidebarBg,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 1, 0),
-        Parent = btn
     })
-    Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = btnBg })
+    buttonBg.Parent = button
+    Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = buttonBg })
 
     local page = Create("ScrollingFrame", {
         BackgroundTransparency = 1,
@@ -524,180 +645,151 @@ function TakoGlass:CreateTab(name)
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 4,
         Visible = false,
-        Parent = self.Content
     })
+    page.Parent = self.Content
 
     local layout = Create("UIListLayout", {
         FillDirection = Enum.FillDirection.Vertical,
         Padding = UDim.new(0, 12),
-        Parent = page
     })
+    layout.Parent = page
 
     Create("UIPadding", {
         PaddingTop = UDim.new(0, 10),
         PaddingLeft = UDim.new(0, 14),
         PaddingRight = UDim.new(0, 14),
-        Parent = page
+        Parent = page,
     })
 
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
     end)
 
-    local tab = {}
-    tab.Window = self
-    tab.Button = btn
-    tab.ButtonBg = btnBg
-    tab.Page = page
-    tab.Sections = {}
+    local tab = {
+        Window = self,
+        Button = button,
+        ButtonBg = buttonBg,
+        Page = page,
+        Sections = {}
+    }
 
     function tab:SetActive()
         for _, other in ipairs(self.Window.Tabs) do
             other.Page.Visible = false
-            DoTween(other.ButtonBg, { BackgroundTransparency = 1 }, 0.15)
-            DoTween(other.Button,   { TextColor3 = self.Window.Theme.Placeholder }, 0.15)
+            Ease(other.ButtonBg, { BackgroundTransparency = 1 }, 0.15)
+            Ease(other.Button, { TextColor3 = Themes[self.Window.ThemeName].SubText }, 0.15)
         end
         self.Page.Visible = true
-        DoTween(self.ButtonBg, { BackgroundTransparency = 0, BackgroundColor3 = self.Window.Theme.Button }, 0.15)
-        DoTween(self.Button,   { TextColor3 = self.Window.Theme.Text }, 0.15)
+        Ease(self.ButtonBg, { BackgroundTransparency = 0, BackgroundColor3 = Themes[self.Window.ThemeName].ElementBg }, 0.15)
+        Ease(self.Button, { TextColor3 = Themes[self.Window.ThemeName].Text }, 0.15)
     end
 
-    function tab:ApplyTheme(t)
-        DoTween(self.Button, { TextColor3 = t.Placeholder }, 0.01)
-        DoTween(self.ButtonBg, { BackgroundColor3 = t.Button }, 0.01)
-        for _, sec in ipairs(self.Sections) do
-            sec:ApplyTheme(t)
+    function tab:ApplyTheme(theme)
+        self.Button.TextColor3 = theme.SubText
+        self.ButtonBg.BackgroundColor3 = theme.SidebarBg
+        for _, section in ipairs(self.Sections) do
+            if section.ApplyTheme then
+                section:ApplyTheme(theme)
+            end
         end
     end
 
-    -------------------------------------------------
-    -- Section (card)
-    -------------------------------------------------
-
+    -- Sections
     function tab:CreateSection(title, description)
-        local t = self.Window.Theme
+        local theme = Themes[self.Window.ThemeName]
 
         local card = Create("Frame", {
-            BackgroundColor3 = t.Button,
+            BackgroundColor3 = theme.CardBg,
             BackgroundTransparency = 0.06,
             BorderSizePixel = 0,
             Size = UDim2.new(1, 0, 0, 90),
-            Parent = self.Page
         })
+        card.Parent = self.Page
+
         Create("UICorner", { CornerRadius = UDim.new(0, 14), Parent = card })
         local stroke = Create("UIStroke", {
-            Color = t.Outline,
+            Color = theme.StrokeSoft,
             Thickness = 1,
-            Transparency = 0.40,
-            Parent = card
+            Transparency = 0.4,
         })
+        stroke.Parent = card
 
         Create("UIPadding", {
             PaddingTop = UDim.new(0, 10),
             PaddingBottom = UDim.new(0, 10),
             PaddingLeft = UDim.new(0, 14),
             PaddingRight = UDim.new(0, 14),
-            Parent = card
+            Parent = card,
         })
 
         local titleLabel = Create("TextLabel", {
-            Text = title or "Section",
-            Font = Enum.Font.GothamSemibold,
-            TextSize = 15,
-            TextColor3 = t.Text,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, -80, 0, 20),
+            Font = Enum.Font.GothamSemibold,
+            Text = title or "Section",
+            TextColor3 = theme.Text,
+            TextSize = 15,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = card
+            Size = UDim2.new(1, -80, 0, 20),
         })
+        titleLabel.Parent = card
 
         local descLabel = Create("TextLabel", {
-            Text = description or "",
-            Font = Enum.Font.Gotham,
-            TextSize = 13,
-            TextColor3 = t.Placeholder,
             BackgroundTransparency = 1,
-            Position = UDim2.new(0, 0, 0, 22),
-            Size = UDim2.new(1, -80, 0, 18),
+            Font = Enum.Font.Gotham,
+            Text = description or "",
+            TextColor3 = theme.SubText,
+            TextSize = 13,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
-            Parent = card
+            Position = UDim2.new(0, 0, 0, 22),
+            Size = UDim2.new(1, -80, 0, 18),
         })
+        descLabel.Parent = card
 
         local content = Create("Frame", {
             BackgroundTransparency = 1,
             Position = UDim2.new(0, 0, 0, 44),
             Size = UDim2.new(1, 0, 0, 0),
-            Parent = card
         })
+        content.Parent = card
+
         local cLayout = Create("UIListLayout", {
             FillDirection = Enum.FillDirection.Vertical,
             Padding = UDim.new(0, 6),
-            Parent = content
         })
+        cLayout.Parent = content
 
         cLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             content.Size = UDim2.new(1, 0, 0, cLayout.AbsoluteContentSize.Y)
-            card.Size    = UDim2.new(1, 0, 0, 50 + cLayout.AbsoluteContentSize.Y)
+            card.Size = UDim2.new(1, 0, 0, 50 + cLayout.AbsoluteContentSize.Y)
         end)
 
-        local section = {}
-        section.Window = self.Window
-        section.Tab = self
-        section.Card = card
-        section.Content = content
+        local section = {
+            Window  = self.Window,
+            Tab     = self,
+            Card    = card,
+            Content = content,
+        }
 
-        function section:ApplyTheme(t2)
-            card.BackgroundColor3 = t2.Button
-            stroke.Color = t2.Outline
-            titleLabel.TextColor3 = t2.Text
-            descLabel.TextColor3 = t2.Placeholder
+        function section:ApplyTheme(theme)
+            card.BackgroundColor3 = theme.CardBg
+            stroke.Color = theme.StrokeSoft
+            titleLabel.TextColor3 = theme.Text
+            descLabel.TextColor3 = theme.SubText
         end
 
         -------------------------------------------------
-        -- Elements
+        -- Toggle
         -------------------------------------------------
 
-        function section:AddButton(opt)
-            opt = opt or {}
-            local text = opt.Name or "Button"
-            local callback = opt.Callback or function() end
-            local t2 = self.Window.Theme
+        function section:AddToggle(opts)
+            opts = opts or {}
+            local name = opts.Name or "Toggle"
+            local flag = opts.Flag or ("TG_Toggle_" .. name)
+            local default = opts.Default or false
+            local callback = opts.Callback or function() end
 
-            local btn = Create("TextButton", {
-                Text = text,
-                Font = Enum.Font.Gotham,
-                TextSize = 13,
-                TextColor3 = t2.Text,
-                BackgroundColor3 = t2.Button,
-                BackgroundTransparency = 0.12,
-                BorderSizePixel = 0,
-                Size = UDim2.new(1, 0, 0, 24),
-                Parent = self.Content
-            })
-            Create("UICorner", { CornerRadius = UDim.new(0, 10), Parent = btn })
-
-            btn.MouseEnter:Connect(function()
-                DoTween(btn, { BackgroundColor3 = t2.Accent }, 0.12)
-            end)
-            btn.MouseLeave:Connect(function()
-                DoTween(btn, { BackgroundColor3 = t2.Button }, 0.12)
-            end)
-
-            btn.MouseButton1Click:Connect(function()
-                pcall(callback)
-            end)
-
-            return btn
-        end
-
-        function section:AddToggle(opt)
-            opt = opt or {}
-            local name = opt.Name or "Toggle"
-            local flag = opt.Flag or ("TG_Toggle_" .. name)
-            local default = opt.Default or false
-            local callback = opt.Callback or function() end
-            local t2 = self.Window.Theme
+            local theme = Themes[self.Window.ThemeName]
 
             if self.Window.Config[flag] == nil then
                 self.Window.Config[flag] = default
@@ -707,28 +799,28 @@ function TakoGlass:CreateTab(name)
             local row = Create("Frame", {
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 22),
-                Parent = self.Content
             })
+            row.Parent = self.Content
 
             local label = Create("TextLabel", {
-                Text = name,
-                Font = Enum.Font.Gotham,
-                TextSize = 13,
-                TextColor3 = t2.Text,
                 BackgroundTransparency = 1,
-                Size = UDim2.new(1, -60, 1, 0),
+                Font = Enum.Font.Gotham,
+                Text = name,
+                TextColor3 = theme.Text,
+                TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Parent = row
+                Size = UDim2.new(1, -60, 1, 0),
             })
+            label.Parent = row
 
             local pill = Create("Frame", {
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
                 Size = UDim2.new(0, 42, 0, 20),
-                BackgroundColor3 = self.Window.Flags[flag] and t2.Accent or t2.Button,
+                BackgroundColor3 = self.Window.Flags[flag] and theme.Accent or theme.ElementBg,
                 BorderSizePixel = 0,
-                Parent = row
             })
+            pill.Parent = row
             Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = pill })
 
             local knob = Create("Frame", {
@@ -736,21 +828,28 @@ function TakoGlass:CreateTab(name)
                 Position = self.Window.Flags[flag] and UDim2.new(1, -19, 0.5, -9) or UDim2.new(0, 1, 0.5, -9),
                 BackgroundColor3 = Color3.fromRGB(255, 255, 255),
                 BorderSizePixel = 0,
-                Parent = pill
             })
+            knob.Parent = pill
             Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = knob })
 
-            local function setValue(v)
-                self.Window.Flags[flag] = v
-                self.Window.Config[flag] = v
+            local function applyTheme(theme)
+                pill.BackgroundColor3 = self.Window.Flags[flag] and theme.Accent or theme.ElementBg
+                label.TextColor3 = theme.Text
+            end
+
+            local function setValue(value)
+                self.Window.Flags[flag] = value
+                self.Window.Config[flag] = value
                 SaveConfig(self.Window.ConfigName, self.Window.Config)
 
-                DoTween(pill, { BackgroundColor3 = v and t2.Accent or t2.Button }, 0.16)
-                DoTween(knob, {
-                    Position = v and UDim2.new(1, -19, 0.5, -9) or UDim2.new(0, 1, 0.5, -9)
+                Ease(pill, {
+                    BackgroundColor3 = value and theme.Accent or theme.ElementBg
+                }, 0.16)
+                Ease(knob, {
+                    Position = value and UDim2.new(1, -19, 0.5, -9) or UDim2.new(0, 1, 0.5, -9)
                 }, 0.16)
 
-                pcall(callback, v)
+                callback(value)
             end
 
             row.InputBegan:Connect(function(input)
@@ -759,21 +858,437 @@ function TakoGlass:CreateTab(name)
                 end
             end)
 
+            local element = {
+                ApplyTheme = applyTheme
+            }
+            table.insert(self.Window.Elements, element)
+
             return {
                 Set = setValue,
                 Get = function() return self.Window.Flags[flag] end
             }
         end
 
-        -- Slider, Dropdown, Input remain the same as previous version
-        -- (for brevity you can reuse those blocks unchanged from v2,
-        --  just keep their styles consistent with t2.Button, t2.Accent, etc.)
+        -------------------------------------------------
+        -- Slider
+        -------------------------------------------------
+
+        function section:AddSlider(opts)
+            opts = opts or {}
+            local name    = opts.Name or "Slider"
+            local min     = opts.Min or 0
+            local max     = opts.Max or 100
+            local default = (opts.Default ~= nil) and opts.Default or min
+            local step    = opts.Step or 1
+            local flag    = opts.Flag or ("TG_Slider_" .. name)
+            local callback = opts.Callback or function() end
+
+            local theme = Themes[self.Window.ThemeName]
+
+            if self.Window.Config[flag] == nil then
+                self.Window.Config[flag] = default
+            end
+            self.Window.Flags[flag] = self.Window.Config[flag]
+
+            local frame = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 34),
+            })
+            frame.Parent = self.Content
+
+            local label = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Gotham,
+                Text = name,
+                TextColor3 = theme.Text,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Size = UDim2.new(0.6, 0, 0, 18),
+            })
+            label.Parent = frame
+
+            local valueLabel = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Gotham,
+                Text = tostring(self.Window.Flags[flag]),
+                TextColor3 = theme.SubText,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                AnchorPoint = Vector2.new(1, 0),
+                Position = UDim2.new(1, 0, 0, 0),
+                Size = UDim2.new(0.4, 0, 0, 18),
+            })
+            valueLabel.Parent = frame
+
+            local bar = Create("Frame", {
+                BackgroundColor3 = theme.ElementBg,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 0, 4),
+                Position = UDim2.new(0, 0, 0, 22),
+            })
+            bar.Parent = frame
+            Create("UICorner", { CornerRadius = UDim.new(0, 3), Parent = bar })
+
+            local function valueToAlpha(v)
+                return (v - min) / (max - min)
+            end
+
+            local fill = Create("Frame", {
+                BackgroundColor3 = theme.Accent,
+                BorderSizePixel = 0,
+                Size = UDim2.new(valueToAlpha(self.Window.Flags[flag]), 0, 1, 0),
+            })
+            fill.Parent = bar
+            Create("UICorner", { CornerRadius = UDim.new(0, 3), Parent = fill })
+
+            local dragging = false
+
+            local function setValueFromAlpha(alpha)
+                alpha = math.clamp(alpha, 0, 1)
+                local raw = min + (max - min) * alpha
+                local stepped = math.floor(raw / step + 0.5) * step
+                stepped = math.clamp(stepped, min, max)
+
+                self.Window.Flags[flag] = stepped
+                self.Window.Config[flag] = stepped
+                SaveConfig(self.Window.ConfigName, self.Window.Config)
+
+                fill.Size = UDim2.new(valueToAlpha(stepped), 0, 1, 0)
+                valueLabel.Text = tostring(stepped)
+                callback(stepped)
+            end
+
+            bar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = true
+                    setValueFromAlpha((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X)
+                end
+            end)
+            bar.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = false
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    setValueFromAlpha((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X)
+                end
+            end)
+
+            local function applyTheme(theme)
+                label.TextColor3 = theme.Text
+                valueLabel.TextColor3 = theme.SubText
+                bar.BackgroundColor3 = theme.ElementBg
+                fill.BackgroundColor3 = theme.Accent
+            end
+
+            local element = { ApplyTheme = applyTheme }
+            table.insert(self.Window.Elements, element)
+
+            return {
+                Set = function(v)
+                    setValueFromAlpha(valueToAlpha(v))
+                end
+            }
+        end
+
+        -------------------------------------------------
+        -- Dropdown
+        -------------------------------------------------
+
+        function section:AddDropdown(opts)
+            opts = opts or {}
+            local name     = opts.Name or "Dropdown"
+            local list     = opts.Options or {}
+            local default  = opts.Default or list[1]
+            local flag     = opts.Flag or ("TG_Drop_" .. name)
+            local callback = opts.Callback or function() end
+
+            local theme = Themes[self.Window.ThemeName]
+
+            if self.Window.Config[flag] == nil then
+                self.Window.Config[flag] = default
+            end
+            self.Window.Flags[flag] = self.Window.Config[flag]
+
+            local row = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 30),
+            })
+            row.Parent = self.Content
+
+            local label = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Gotham,
+                Text = name,
+                TextColor3 = theme.Text,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Size = UDim2.new(0.4, 0, 1, 0),
+            })
+            label.Parent = row
+
+            local button = Create("TextButton", {
+                BackgroundColor3 = theme.ElementBg,
+                BackgroundTransparency = 0.05,
+                BorderSizePixel = 0,
+                Text = tostring(self.Window.Flags[flag]),
+                Font = Enum.Font.Gotham,
+                TextColor3 = theme.Text,
+                TextSize = 13,
+                AnchorPoint = Vector2.new(1, 0.5),
+                Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.new(0.6, 0, 0, 24),
+            })
+            button.Parent = row
+            Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = button })
+
+            local listFrame = Create("Frame", {
+                BackgroundColor3 = theme.CardBg,
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 180, 0, 0),
+                Visible = false,
+                AnchorPoint = Vector2.new(1, 0),
+                Position = UDim2.new(1, 0, 1, 2),
+            })
+            listFrame.Parent = row
+            Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = listFrame })
+            Create("UIStroke", {
+                Color = theme.StrokeSoft,
+                Thickness = 1,
+                Transparency = 0.4,
+                Parent = listFrame,
+            })
+
+            local scroll = Create("ScrollingFrame", {
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 1, 0),
+                CanvasSize = UDim2.new(0, 0, 0, 0),
+                ScrollBarThickness = 3,
+            })
+            scroll.Parent = listFrame
+
+            local lLayout = Create("UIListLayout", {
+                FillDirection = Enum.FillDirection.Vertical,
+                Padding = UDim.new(0, 2),
+            })
+            lLayout.Parent = scroll
+
+            local function rebuild()
+                for _, child in ipairs(scroll:GetChildren()) do
+                    if child:IsA("TextButton") then
+                        child:Destroy()
+                    end
+                end
+
+                for _, option in ipairs(list) do
+                    local optButton = Create("TextButton", {
+                        BackgroundTransparency = 1,
+                        Text = tostring(option),
+                        Font = Enum.Font.Gotham,
+                        TextSize = 13,
+                        TextColor3 = theme.Text,
+                        Size = UDim2.new(1, -6, 0, 22),
+                    })
+                    optButton.Parent = scroll
+
+                    optButton.MouseButton1Click:Connect(function()
+                        self.Window.Flags[flag] = option
+                        self.Window.Config[flag] = option
+                        SaveConfig(self.Window.ConfigName, self.Window.Config)
+                        button.Text = tostring(option)
+                        listFrame.Visible = false
+                        callback(option)
+                    end)
+                end
+
+                scroll.CanvasSize = UDim2.new(0, 0, 0, lLayout.AbsoluteContentSize.Y + 4)
+                listFrame.Size = UDim2.new(0, 180, 0, math.min(lLayout.AbsoluteContentSize.Y + 4, 120))
+            end
+
+            lLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                scroll.CanvasSize = UDim2.new(0, 0, 0, lLayout.AbsoluteContentSize.Y + 4)
+            end)
+
+            rebuild()
+
+            button.MouseButton1Click:Connect(function()
+                listFrame.Visible = not listFrame.Visible
+            end)
+
+            -- close when clicking outside
+            UserInputService.InputBegan:Connect(function(input, gpe)
+                if gpe then return end
+                if listFrame.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    local pos = input.Position
+                    local absPos = listFrame.AbsolutePosition
+                    local absSize = listFrame.AbsoluteSize
+                    local inside = pos.X >= absPos.X and pos.X <= absPos.X + absSize.X
+                        and pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y
+
+                    if not inside then
+                        listFrame.Visible = false
+                    end
+                end
+            end)
+
+            local function applyTheme(theme)
+                label.TextColor3 = theme.Text
+                button.BackgroundColor3 = theme.ElementBg
+                button.TextColor3 = theme.Text
+                listFrame.BackgroundColor3 = theme.CardBg
+            end
+
+            local element = { ApplyTheme = applyTheme }
+            table.insert(self.Window.Elements, element)
+
+            return {
+                Set = function(value)
+                    self.Window.Flags[flag] = value
+                    self.Window.Config[flag] = value
+                    SaveConfig(self.Window.ConfigName, self.Window.Config)
+                    button.Text = tostring(value)
+                    callback(value)
+                end,
+                Refresh = function(newOptions)
+                    list = newOptions or {}
+                    rebuild()
+                end
+            }
+        end
+
+        -------------------------------------------------
+        -- Input
+        -------------------------------------------------
+
+        function section:AddInput(opts)
+            opts = opts or {}
+            local name        = opts.Name or "Input"
+            local flag        = opts.Flag or ("TG_Input_" .. name)
+            local default     = opts.Default or ""
+            local placeholder = opts.Placeholder or ""
+            local callback    = opts.Callback or function() end
+
+            local theme = Themes[self.Window.ThemeName]
+
+            if self.Window.Config[flag] == nil then
+                self.Window.Config[flag] = default
+            end
+            self.Window.Flags[flag] = self.Window.Config[flag]
+
+            local row = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 30),
+            })
+            row.Parent = self.Content
+
+            local label = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Gotham,
+                Text = name,
+                TextColor3 = theme.Text,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Size = UDim2.new(0.35, 0, 1, 0),
+            })
+            label.Parent = row
+
+            local box = Create("TextBox", {
+                BackgroundColor3 = theme.ElementBg,
+                BackgroundTransparency = 0.05,
+                BorderSizePixel = 0,
+                Text = tostring(self.Window.Flags[flag]),
+                PlaceholderText = placeholder,
+                Font = Enum.Font.Gotham,
+                TextColor3 = theme.Text,
+                TextSize = 13,
+                ClearTextOnFocus = false,
+                AnchorPoint = Vector2.new(1, 0.5),
+                Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.new(0.65, 0, 0, 24),
+            })
+            box.Parent = row
+            Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = box })
+
+            box.FocusLost:Connect(function(enterPressed)
+                self.Window.Flags[flag] = box.Text
+                self.Window.Config[flag] = box.Text
+                SaveConfig(self.Window.ConfigName, self.Window.Config)
+                callback(box.Text, enterPressed)
+            end)
+
+            local function applyTheme(theme)
+                label.TextColor3 = theme.Text
+                box.BackgroundColor3 = theme.ElementBg
+                box.TextColor3 = theme.Text
+            end
+
+            local element = { ApplyTheme = applyTheme }
+            table.insert(self.Window.Elements, element)
+
+            return {
+                Set = function(value)
+                    value = tostring(value)
+                    self.Window.Flags[flag] = value
+                    self.Window.Config[flag] = value
+                    SaveConfig(self.Window.ConfigName, self.Window.Config)
+                    box.Text = value
+                    callback(value, false)
+                end
+            }
+        end
+
+        -------------------------------------------------
+        -- Button
+        -------------------------------------------------
+
+        function section:AddButton(opts)
+            opts = opts or {}
+            local text     = opts.Name or "Button"
+            local callback = opts.Callback or function() end
+
+            local theme = Themes[self.Window.ThemeName]
+
+            local btn = Create("TextButton", {
+                BackgroundColor3 = theme.ElementBg,
+                BackgroundTransparency = 0.05,
+                BorderSizePixel = 0,
+                Text = text,
+                Font = Enum.Font.Gotham,
+                TextSize = 13,
+                TextColor3 = theme.Text,
+                Size = UDim2.new(1, 0, 0, 24),
+            })
+            btn.Parent = self.Content
+            Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = btn })
+
+            btn.MouseEnter:Connect(function()
+                Ease(btn, { BackgroundColor3 = theme.AccentSoft }, 0.12)
+            end)
+            btn.MouseLeave:Connect(function()
+                Ease(btn, { BackgroundColor3 = theme.ElementBg }, 0.12)
+            end)
+            btn.MouseButton1Click:Connect(function()
+                callback()
+            end)
+
+            local function applyTheme(theme)
+                btn.BackgroundColor3 = theme.ElementBg
+                btn.TextColor3 = theme.Text
+            end
+
+            local element = { ApplyTheme = applyTheme }
+            table.insert(self.Window.Elements, element)
+
+            return btn
+        end
 
         table.insert(self.Sections, section)
         return section
     end
 
-    btn.MouseButton1Click:Connect(function()
+    button.MouseButton1Click:Connect(function()
         tab:SetActive()
     end)
 
