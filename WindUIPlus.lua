@@ -1,4 +1,4 @@
--- TakoGlass UI v7.5
+-- TakoGlass UI v7.5 - FIXED AND IMPROVED
 -- Glass-style Roblox UI with:
 -- - Tabs, sections, toggles, sliders, dropdowns, inputs, buttons
 -- - Config saving (if file APIs exist)
@@ -6,7 +6,8 @@
 -- - Blur + toggle key
 -- - Dropdown hover highlight
 -- - Animated close confirmation dialog
--- - Clean, aligned layout & visible tab text / close X
+-- - Animated key-toggle close (NEW)
+-- - Fixed layout resizing using GetPropertyChangedSignal (FIXED)
 
 --------------------------------------------------
 -- Services / Guard
@@ -455,6 +456,9 @@ function TakoGlass:CreateWindow(opts)
     self.Size         = opts.Size or UDim2.fromOffset(580, 460)
     self.SidebarWidth = opts.SidebarWidth or 200
     self.Transparent  = (opts.Transparent ~= nil) and opts.Transparent or true
+    
+    -- NEW: Configurable Toggle Key
+    self.ToggleKey    = opts.ToggleKey or Enum.KeyCode.RightShift
 
     self.UseBlur      = (opts.UseBlur ~= nil) and opts.UseBlur or false
     self.BlurSize     = opts.BlurSize or 18
@@ -467,7 +471,6 @@ function TakoGlass:CreateWindow(opts)
 
     self.Tabs         = {}
     self.Elements     = {}
-    self.ToggleKey    = Enum.KeyCode.RightShift
     self.IsOpen       = true
     self.IsMinimized  = false
     self._connections = {}
@@ -742,9 +745,31 @@ end
 
 function TakoGlass:SetVisible(state)
     self.IsOpen = state
-    if self.Gui then
-        self.Gui.Enabled = state
+    local theme = Themes[self.ThemeName]
+
+    if state then
+        self.Gui.Enabled = true
+        -- Animate to full size and opacity
+        Ease(self.Main, {
+            Size = self.Size,
+            BackgroundTransparency = self.Transparent and theme.WindowAlpha or 0
+        }, 0.2)
+    else
+        -- NEW: Animated close (Scale down and fade out)
+        Ease(self.Main, {
+            Size = UDim2.fromOffset(self.Size.X.Offset * 0.8, self.Size.Y.Offset * 0.8),
+            BackgroundTransparency = 1,
+        }, 0.15)
+        task.delay(0.15, function()
+            if not self.IsOpen then -- Only disable if still closed after animation
+                self.Gui.Enabled = false
+            end
+            -- Reset properties for next open animation
+            self.Main.Size = self.Size
+            self.Main.BackgroundTransparency = self.Transparent and theme.WindowAlpha or 0
+        end)
     end
+    
     if self.BlurObject then
         self.BlurObject.Enabled = state and self.UseBlur or false
     end
@@ -1004,8 +1029,10 @@ function TakoGlass:CreateTab(name)
             content.Size = UDim2.new(1, 0, 0, contentHeight)
             frame.Size = UDim2.new(1, 0, 0, 20 + contentHeight)
         end
-        sectionLayout.DidUpdate:Connect(UpdateHeight)
-        UpdateHeight()
+        
+        -- FIX: Use GetPropertyChangedSignal for robust layout updates
+        sectionLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateHeight)
+        UpdateHeight() -- Initial call so size is right on create
 
         function section:ApplyTheme(theme)
             self.Title.TextColor3 = theme.Text
