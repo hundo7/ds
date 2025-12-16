@@ -404,7 +404,7 @@ function TakoGlass:CreateWindow(opts)
     -- minimize & close
     local minimizeButton = Create("TextButton", {
         BackgroundTransparency = 1,
-        Text = "–",
+        Text = "-",
         Font = Enum.Font.GothamBold,
         TextSize = 20,
         TextColor3 = theme.SubText,
@@ -415,7 +415,7 @@ function TakoGlass:CreateWindow(opts)
 
     local closeButton = Create("TextButton", {
         BackgroundTransparency = 1,
-        Text = "✕",
+        Text = "X",
         Font = Enum.Font.GothamBold,
         TextSize = 18,
         TextColor3 = theme.SubText,
