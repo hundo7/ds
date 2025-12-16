@@ -1,21 +1,22 @@
--- TakoGlass UI v5
--- WindUI-style glass UI with:
---  - Tabs, sections, toggles, sliders, dropdowns, inputs, buttons
---  - Config saving (if executor supports file IO)
---  - Full theme color customization (SetTheme / SetThemeColors)
---  - Toggle key, optional blur, mobile + PC support
---  - Fixed notifications, dropdowns, sliders, offsets, and transparency
+-- TakoGlass UI v6
+-- Glass-style Roblox UI library
+-- - Tabs, sections, toggles, sliders, dropdowns, inputs, buttons
+-- - Config saving (if executor supports file IO)
+-- - Full color customization via SetTheme / SetThemeColors
+-- - Toggle key with debounce, optional blur
+-- - Mobile + PC input support
+-- - Fixed tab text visibility, transparency, layout, and edge cases
 
 --------------------------------------------------
 -- Services & client guard
 --------------------------------------------------
 
-local Players            = game:GetService("Players")
-local TweenService       = game:GetService("TweenService")
-local UserInputService   = game:GetService("UserInputService")
-local HttpService        = game:GetService("HttpService")
-local Lighting           = game:GetService("Lighting")
-local RunService         = game:GetService("RunService")
+local Players          = game:GetService("Players")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local HttpService      = game:GetService("HttpService")
+local Lighting         = game:GetService("Lighting")
+local RunService       = game:GetService("RunService")
 
 if not RunService:IsClient() then
     error("TakoGlass must be run on the client.")
@@ -43,16 +44,17 @@ TakoGlass.__index = TakoGlass
 -- Config / Themes
 --------------------------------------------------
 
-local CONFIG_FOLDER  = "TakoGlassConfigs"
-local DEFAULT_THEME  = "Dark"
-local MAX_NOTIF      = 5
-local RADIUS         = 10
+local CONFIG_FOLDER = "TakoGlassConfigs"
+local DEFAULT_THEME = "Dark"
+local MAX_NOTIF     = 5
+local RADIUS        = 10
 
+-- Slightly higher alpha for better readability on transparent modes
 local Themes = {
     Dark = {
         Name        = "Dark",
         WindowBg    = Color3.fromRGB(16, 16, 24),
-        WindowAlpha = 0.10,
+        WindowAlpha = 0.35,
 
         CardBg      = Color3.fromRGB(24, 24, 36),
         ElementBg   = Color3.fromRGB(32, 32, 48),
@@ -70,7 +72,7 @@ local Themes = {
     Light = {
         Name        = "Light",
         WindowBg    = Color3.fromRGB(245, 247, 255),
-        WindowAlpha = 0.06,
+        WindowAlpha = 0.18,
 
         CardBg      = Color3.fromRGB(252, 252, 255),
         ElementBg   = Color3.fromRGB(238, 241, 255),
@@ -119,11 +121,27 @@ local function EnsureConfigFolder()
     end
 end
 
+local function SafeJSONEncode(tbl)
+    local ok, result = pcall(HttpService.JSONEncode, HttpService, tbl)
+    if not ok then
+        return nil
+    end
+    return result
+end
+
+local function SafeJSONDecode(str)
+    local ok, result = pcall(HttpService.JSONDecode, HttpService, str)
+    if not ok or type(result) ~= "table" then
+        return nil
+    end
+    return result
+end
+
 local function SaveConfig(name, data)
     if not HasFileApi() then return end
     EnsureConfigFolder()
-    local ok, json = pcall(HttpService.JSONEncode, HttpService, data)
-    if not ok then return end
+    local json = SafeJSONEncode(data)
+    if not json then return end
     local path = ("%s/%s.json"):format(CONFIG_FOLDER, name)
     writefile(path, json)
 end
@@ -133,13 +151,14 @@ local function LoadConfig(name)
     EnsureConfigFolder()
     local path = ("%s/%s.json"):format(CONFIG_FOLDER, name)
     if not isfile(path) then return {} end
+
     local ok, content = pcall(readfile, path)
-    if not ok then return {} end
-    local ok2, decoded = pcall(HttpService.JSONDecode, HttpService, content)
-    if not ok2 or type(decoded) ~= "table" then
+    if not ok or type(content) ~= "string" then
         return {}
     end
-    return decoded
+
+    local decoded = SafeJSONDecode(content)
+    return decoded or {}
 end
 
 --------------------------------------------------
@@ -162,7 +181,7 @@ end
 --------------------------------------------------
 
 local function GetNotifyGui()
-    local pg = GetPlayerGui()
+    local pg  = GetPlayerGui()
     local gui = pg:FindFirstChild("TakoGlass_Notify")
     if gui then return gui end
 
@@ -194,7 +213,7 @@ local function GetNotifyGui()
 end
 
 function TakoGlass.Notify(title, message, duration)
-    local gui = GetNotifyGui()
+    local gui    = GetNotifyGui()
     local holder = gui:FindFirstChild("Holder")
     if not holder then return end
 
@@ -398,8 +417,8 @@ function TakoGlass:CreateWindow(opts)
     })
     subLabel.Parent = topBar
 
-    self.TitleLabel   = titleLabel
-    self.SubTitleLabel= subLabel
+    self.TitleLabel    = titleLabel
+    self.SubTitleLabel = subLabel
 
     local minimizeButton = Create("TextButton", {
         BackgroundTransparency = 1,
@@ -450,13 +469,13 @@ function TakoGlass:CreateWindow(opts)
 
         local function ClampToViewport(pos)
             local cam = workspace.CurrentCamera
-            local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+            local vp  = cam and cam.ViewportSize or Vector2.new(1920, 1080)
             local halfX = self.Size.X.Offset / 2
             local halfY = self.Size.Y.Offset / 2
-            local minX = -vp.X / 2 + halfX
-            local maxX =  vp.X / 2 - halfX
-            local minY = -vp.Y / 2 + halfY
-            local maxY =  vp.Y / 2 - halfY
+            local minX  = -vp.X / 2 + halfX
+            local maxX  =  vp.X / 2 - halfX
+            local minY  = -vp.Y / 2 + halfY
+            local maxY  =  vp.Y / 2 - halfY
 
             local x = math.clamp(pos.X.Offset, minX, maxX)
             local y = math.clamp(pos.Y.Offset, minY, maxY)
@@ -466,7 +485,7 @@ function TakoGlass:CreateWindow(opts)
         local function beginDrag(input)
             dragging = true
             dragStart = input.Position
-            startPos = main.Position
+            startPos  = main.Position
         end
 
         local function updateDrag(input)
@@ -504,7 +523,7 @@ function TakoGlass:CreateWindow(opts)
     end
 
     --------------------------------------------------
-    -- Sidebar & content
+    -- Sidebar + tab holder
     --------------------------------------------------
 
     local sidebar = Create("Frame", {
@@ -550,9 +569,9 @@ function TakoGlass:CreateWindow(opts)
     })
     content.Parent = main
 
-    self.Sidebar      = sidebar
-    self.TabHolder    = sidebarScroll
-    self.Content      = content
+    self.Sidebar   = sidebar
+    self.TabHolder = sidebarScroll
+    self.Content   = content
 
     --------------------------------------------------
     -- Toggle key (debounced)
@@ -642,7 +661,7 @@ function TakoGlass:SetTheme(name)
     SaveConfig(self.ConfigName, self.Config)
 end
 
--- change colors of current theme at runtime
+-- Fully customize current theme colors at runtime
 function TakoGlass:SetThemeColors(colors)
     colors = colors or {}
     local theme = Themes[self.ThemeName]
@@ -667,7 +686,7 @@ function TakoGlass:CreateTab(name)
         Text = name,
         Font = Enum.Font.Gotham,
         TextSize = 13,
-        TextColor3 = theme.Text,
+        TextColor3 = theme.Text, -- main text color for visibility
         Size = UDim2.new(1, 0, 0, 28),
         TextXAlignment = Enum.TextXAlignment.Left,
     })
@@ -711,10 +730,10 @@ function TakoGlass:CreateTab(name)
     end)
 
     local tab = {
-        Window = self,
-        Button = button,
+        Window   = self,
+        Button   = button,
         ButtonBg = buttonBg,
-        Page   = page,
+        Page     = page,
         Sections = {},
     }
 
@@ -724,7 +743,10 @@ function TakoGlass:CreateTab(name)
             Ease(other.ButtonBg, { BackgroundTransparency = 1 }, 0.12)
         end
         self.Page.Visible = true
-        Ease(self.ButtonBg, { BackgroundTransparency = 0, BackgroundColor3 = Themes[self.Window.ThemeName].ElementBg }, 0.12)
+        Ease(self.ButtonBg, {
+            BackgroundTransparency = 0,
+            BackgroundColor3 = Themes[self.Window.ThemeName].ElementBg
+        }, 0.12)
     end
 
     function tab:ApplyTheme(theme)
@@ -825,7 +847,7 @@ function TakoGlass:CreateTab(name)
 
         cLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             content.Size = UDim2.new(1, 0, 0, cLayout.AbsoluteContentSize.Y)
-            card.Size = UDim2.new(1, 0, 0, math.max(60, 50 + cLayout.AbsoluteContentSize.Y))
+            card.Size = UDim2.new(1, 0, 0, math.max(52, 50 + cLayout.AbsoluteContentSize.Y))
         end)
 
         local section = {
@@ -849,9 +871,9 @@ function TakoGlass:CreateTab(name)
 
         function section:AddToggle(opt)
             opt = opt or {}
-            local name = opt.Name or "Toggle"
-            local flag = opt.Flag or ("TG_Toggle_" .. name)
-            local default = opt.Default == nil and false or opt.Default
+            local name     = opt.Name or "Toggle"
+            local flag     = opt.Flag or ("TG_Toggle_" .. name)
+            local default  = opt.Default == nil and false or opt.Default
             local callback = opt.Callback or function() end
 
             local theme = Themes[self.Window.ThemeName]
@@ -939,14 +961,14 @@ function TakoGlass:CreateTab(name)
 
         function section:AddSlider(opt)
             opt = opt or {}
-            local name    = opt.Name or "Slider"
-            local min     = opt.Min or 0
-            local max     = opt.Max or 100
+            local name     = opt.Name or "Slider"
+            local min      = opt.Min or 0
+            local max      = opt.Max or 100
             if max == min then max = min + 1 end
-            local default = opt.Default; if default == nil then default = min end
-            local step    = opt.Step or 1
-            local flag    = opt.Flag or ("TG_Slider_" .. name)
-            local callback= opt.Callback or function() end
+            local default  = opt.Default; if default == nil then default = min end
+            local step     = opt.Step or 1
+            local flag     = opt.Flag or ("TG_Slider_" .. name)
+            local callback = opt.Callback or function() end
 
             local theme = Themes[self.Window.ThemeName]
 
@@ -1037,6 +1059,7 @@ function TakoGlass:CreateTab(name)
                 and input.UserInputType ~= Enum.UserInputType.Touch then
                     return
                 end
+                if bar.AbsoluteSize.X <= 0 then return end
                 local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
                 setFromAlpha(rel)
             end)
@@ -1048,6 +1071,7 @@ function TakoGlass:CreateTab(name)
                     return
                 end
                 dragging = true
+                if bar.AbsoluteSize.X <= 0 then return end
                 local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
                 setFromAlpha(rel)
             end
@@ -1158,8 +1182,11 @@ function TakoGlass:CreateTab(name)
 
             local function rebuild()
                 for _, child in ipairs(scroll:GetChildren()) do
-                    if child:IsA("TextButton") then child:Destroy() end
+                    if child:IsA("TextButton") then
+                        child:Destroy()
+                    end
                 end
+
                 for _, option in ipairs(list) do
                     local optBtn = Create("TextButton", {
                         BackgroundTransparency = 1,
@@ -1180,6 +1207,7 @@ function TakoGlass:CreateTab(name)
                         callback(option)
                     end)
                 end
+
                 scroll.CanvasSize = UDim2.new(0, 0, 0, lLayout.AbsoluteContentSize.Y + 4)
                 listFrame.Size = UDim2.new(0, 180, 0, math.min(lLayout.AbsoluteContentSize.Y + 4, 120))
             end
