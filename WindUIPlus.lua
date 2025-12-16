@@ -1,11 +1,6 @@
--- TakoGlass UI v7
--- Glass-style Roblox UI library (WindUI-like)
--- - Tabs, sections, toggles, sliders, dropdowns, inputs, buttons
--- - Config saving (if executor supports file IO)
--- - Full color customization via SetTheme / SetThemeColors
--- - Toggle key with debounce, optional blur
--- - Mobile + PC input support
--- - Fixed tab text visibility, close button, transparency, offsets & logic
+-- TakoGlass UI v8
+-- Glass-style Roblox UI library (WindUI-like, cleaned offsets)
+-- Focus: perfectly aligned layout, visible tab text & close X, consistent transparency
 
 --------------------------------------------------
 -- Services & client guard
@@ -62,8 +57,8 @@ local Themes = {
         Accent      = Color3.fromRGB(90, 135, 255),
         AccentSoft  = Color3.fromRGB(72, 110, 220),
 
-        Text        = Color3.fromRGB(240, 240, 250),
-        SubText     = Color3.fromRGB(155, 160, 185),
+        Text        = Color3.fromRGB(255, 255, 255),
+        SubText     = Color3.fromRGB(175, 180, 205),
 
         StrokeSoft  = Color3.fromRGB(80, 80, 110),
     },
@@ -101,8 +96,11 @@ end
 
 local function Ease(obj, goal, t)
     if not obj then return end
-    local info = TweenInfo.new(t or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    TweenService:Create(obj, info, goal):Play()
+    TweenService:Create(
+        obj,
+        TweenInfo.new(t or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        goal
+    ):Play()
 end
 
 local function HasFileApi()
@@ -122,17 +120,13 @@ end
 
 local function SafeJSONEncode(tbl)
     local ok, result = pcall(HttpService.JSONEncode, HttpService, tbl)
-    if not ok then
-        return nil
-    end
+    if not ok then return nil end
     return result
 end
 
 local function SafeJSONDecode(str)
     local ok, result = pcall(HttpService.JSONDecode, HttpService, str)
-    if not ok or type(result) ~= "table" then
-        return nil
-    end
+    if not ok or type(result) ~= "table" then return nil end
     return result
 end
 
@@ -141,8 +135,7 @@ local function SaveConfig(name, data)
     EnsureConfigFolder()
     local json = SafeJSONEncode(data)
     if not json then return end
-    local path = ("%s/%s.json"):format(CONFIG_FOLDER, name)
-    writefile(path, json)
+    writefile(("%s/%s.json"):format(CONFIG_FOLDER, name), json)
 end
 
 local function LoadConfig(name)
@@ -150,18 +143,13 @@ local function LoadConfig(name)
     EnsureConfigFolder()
     local path = ("%s/%s.json"):format(CONFIG_FOLDER, name)
     if not isfile(path) then return {} end
-
     local ok, content = pcall(readfile, path)
-    if not ok or type(content) ~= "string" then
-        return {}
-    end
-
+    if not ok or type(content) ~= "string" then return {} end
     local decoded = SafeJSONDecode(content)
     return decoded or {}
 end
 
--- unified card transparency for glass look (sections + notifications)
-local function GetCardTransparency(isTransparent)
+local function CardAlpha(isTransparent)
     return isTransparent and 0.25 or 0.06
 end
 
@@ -184,8 +172,8 @@ end
 -- Notifications
 --------------------------------------------------
 
--- last theme used (so notifications match window)
 local _currentThemeName = DEFAULT_THEME
+local _currentTransparent = true
 
 local function GetNotifyGui()
     local pg  = GetPlayerGui()
@@ -226,7 +214,6 @@ function TakoGlass.Notify(title, message, duration)
 
     local theme = Themes[_currentThemeName] or Themes[DEFAULT_THEME]
 
-    -- limit stack
     local stack = {}
     for _, child in ipairs(holder:GetChildren()) do
         if child:IsA("Frame") then
@@ -239,10 +226,10 @@ function TakoGlass.Notify(title, message, duration)
 
     local card = Create("Frame", {
         BackgroundColor3 = theme.CardBg,
-        BackgroundTransparency = GetCardTransparency(true), -- same glass as sections in transparent mode
+        BackgroundTransparency = CardAlpha(_currentTransparent),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 0),
-        ZIndex = 100,
+        ZIndex = 200,
     })
     card.Parent = holder
 
@@ -269,7 +256,7 @@ function TakoGlass.Notify(title, message, duration)
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
         Size = UDim2.new(1, 0, 0, 18),
-        ZIndex = 101,
+        ZIndex = 201,
     })
     titleLabel.Parent = card
 
@@ -284,7 +271,7 @@ function TakoGlass.Notify(title, message, duration)
         TextYAlignment = Enum.TextYAlignment.Top,
         Size = UDim2.new(1, 0, 0, 0),
         Position = UDim2.new(0, 0, 0, 18),
-        ZIndex = 101,
+        ZIndex = 201,
     })
     body.Parent = card
 
@@ -353,6 +340,7 @@ function TakoGlass:CreateWindow(opts)
     local playerGui= GetPlayerGui()
 
     _currentThemeName = self.ThemeName
+    _currentTransparent = self.Transparent
 
     self.BlurObject = GetBlur()
     self.BlurObject.Size = self.BlurSize
@@ -375,6 +363,7 @@ function TakoGlass:CreateWindow(opts)
         BackgroundTransparency = self.Transparent and theme.WindowAlpha or 0,
         BorderSizePixel = 0,
         ClipsDescendants = true,
+        ZIndex = 50,
     })
     main.Parent = gui
     Create("UICorner", { CornerRadius = UDim.new(0, RADIUS + 4), Parent = main })
@@ -393,11 +382,12 @@ function TakoGlass:CreateWindow(opts)
     local topBar = Create("Frame", {
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 44),
+        ZIndex = 51,
     })
     topBar.Parent = main
 
     Create("UIPadding", {
-        PaddingLeft = UDim.new(0, 16),
+        PaddingLeft  = UDim.new(0, 16),
         PaddingRight = UDim.new(0, 12),
         Parent = topBar,
     })
@@ -411,6 +401,7 @@ function TakoGlass:CreateWindow(opts)
         TextXAlignment = Enum.TextXAlignment.Left,
         Size = UDim2.new(0.7, 0, 0, 20),
         Position = UDim2.new(0, 0, 0, 6),
+        ZIndex = 52,
     })
     titleLabel.Parent = topBar
 
@@ -423,6 +414,7 @@ function TakoGlass:CreateWindow(opts)
         TextXAlignment = Enum.TextXAlignment.Left,
         Size = UDim2.new(0.7, 0, 0, 18),
         Position = UDim2.new(0, 0, 0, 24),
+        ZIndex = 52,
     })
     subLabel.Parent = topBar
 
@@ -434,9 +426,10 @@ function TakoGlass:CreateWindow(opts)
         Text = "–",
         Font = Enum.Font.GothamBold,
         TextSize = 20,
-        TextColor3 = theme.SubText,
+        TextColor3 = theme.Text,
         Size = UDim2.new(0, 28, 1, 0),
         Position = UDim2.new(1, -64, 0, 0),
+        ZIndex = 53,
     })
     minimizeButton.Parent = topBar
 
@@ -445,9 +438,10 @@ function TakoGlass:CreateWindow(opts)
         Text = "✕",
         Font = Enum.Font.GothamBold,
         TextSize = 18,
-        TextColor3 = theme.Text,  -- ensure X is always visible
+        TextColor3 = theme.Text,  -- always bright
         Size = UDim2.new(0, 28, 1, 0),
         Position = UDim2.new(1, -32, 0, 0),
+        ZIndex = 53,
     })
     closeButton.Parent = topBar
 
@@ -469,7 +463,7 @@ function TakoGlass:CreateWindow(opts)
     end)
 
     --------------------------------------------------
-    -- Drag (mouse + touch)
+    -- Drag
     --------------------------------------------------
 
     do
@@ -485,14 +479,13 @@ function TakoGlass:CreateWindow(opts)
             local maxX  =  vp.X / 2 - halfX
             local minY  = -vp.Y / 2 + halfY
             local maxY  =  vp.Y / 2 - halfY
-
             local x = math.clamp(pos.X.Offset, minX, maxX)
             local y = math.clamp(pos.Y.Offset, minY, maxY)
             return UDim2.new(0.5, x, 0.5, y)
         end
 
         local function beginDrag(input)
-            dragging = true
+            dragging  = true
             dragStart = input.Position
             startPos  = main.Position
         end
@@ -500,13 +493,14 @@ function TakoGlass:CreateWindow(opts)
         local function updateDrag(input)
             if not dragging then return end
             local delta = input.Position - dragStart
-            local newPos = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
+            main.Position = ClampToViewport(
+                UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
             )
-            main.Position = ClampToViewport(newPos)
         end
 
         topBar.InputBegan:Connect(function(input)
@@ -532,7 +526,7 @@ function TakoGlass:CreateWindow(opts)
     end
 
     --------------------------------------------------
-    -- Sidebar + tab holder
+    -- Sidebar + content
     --------------------------------------------------
 
     local sidebar = Create("Frame", {
@@ -542,6 +536,7 @@ function TakoGlass:CreateWindow(opts)
         Position = UDim2.new(0, 0, 0, 44),
         Size = UDim2.new(0, self.SidebarWidth, 1, -44),
         ClipsDescendants = true,
+        ZIndex = 51,
     })
     sidebar.Parent = main
     Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = sidebar })
@@ -552,6 +547,7 @@ function TakoGlass:CreateWindow(opts)
         Size = UDim2.new(1, 0, 1, 0),
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 3,
+        ZIndex = 52,
     })
     sidebarScroll.Parent = sidebar
 
@@ -577,6 +573,7 @@ function TakoGlass:CreateWindow(opts)
         Position = UDim2.new(0, self.SidebarWidth, 0, 44),
         Size = UDim2.new(1, -self.SidebarWidth, 1, -44),
         ClipsDescendants = true,
+        ZIndex = 51,
     })
     content.Parent = main
 
@@ -585,15 +582,14 @@ function TakoGlass:CreateWindow(opts)
     self.Content   = content
 
     --------------------------------------------------
-    -- Toggle key (debounced)
+    -- Toggle key
     --------------------------------------------------
 
     local lastToggle = 0
     local toggleConn = UserInputService.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.UserInputType == Enum.UserInputType.Keyboard
-            and input.KeyCode == self.ToggleKey then
-
+           and input.KeyCode == self.ToggleKey then
             local now = tick()
             if now - lastToggle < 0.15 then return end
             lastToggle = now
@@ -638,6 +634,7 @@ function TakoGlass:SetTheme(name)
     if not Themes[name] then return end
     self.ThemeName = name
     _currentThemeName = name
+    _currentTransparent = self.Transparent
     local theme = Themes[name]
 
     if self.Main then
@@ -700,6 +697,7 @@ function TakoGlass:CreateTab(name)
         TextColor3 = theme.Text,
         Size = UDim2.new(1, 0, 0, 30),
         TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 52,
     })
     button.Parent = self.TabHolder
 
@@ -713,7 +711,7 @@ function TakoGlass:CreateTab(name)
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 1, 0),
-        ZIndex = button.ZIndex - 1,
+        ZIndex = 51,
     })
     buttonBg.Parent = button
     Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = buttonBg })
@@ -725,6 +723,7 @@ function TakoGlass:CreateTab(name)
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 6,
         Visible = false,
+        ZIndex = 51,
     })
     page.Parent = self.Content
 
@@ -780,11 +779,13 @@ function TakoGlass:CreateTab(name)
             Ease(buttonBg, { BackgroundTransparency = 0.3 }, 0.1)
         end
     end)
+
     button.MouseLeave:Connect(function()
         if not page.Visible then
             Ease(buttonBg, { BackgroundTransparency = 1 }, 0.1)
         end
     end)
+
     button.MouseButton1Click:Connect(function()
         tab:SetActive()
     end)
@@ -803,9 +804,10 @@ function TakoGlass:CreateTab(name)
 
         local card = Create("Frame", {
             BackgroundColor3 = theme.CardBg,
-            BackgroundTransparency = GetCardTransparency(self.Window.Transparent),
+            BackgroundTransparency = CardAlpha(self.Window.Transparent),
             BorderSizePixel = 0,
             Size = UDim2.new(1, 0, 0, 60),
+            ZIndex = 52,
         })
         card.Parent = self.Page
         Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = card })
@@ -813,8 +815,8 @@ function TakoGlass:CreateTab(name)
             Color = theme.StrokeSoft,
             Thickness = 1,
             Transparency = 0.4,
+            Parent = card,
         })
-        stroke.Parent = card
 
         Create("UIPadding", {
             PaddingTop = UDim.new(0, 10),
@@ -832,6 +834,7 @@ function TakoGlass:CreateTab(name)
             TextSize = 15,
             TextXAlignment = Enum.TextXAlignment.Left,
             Size = UDim2.new(1, -80, 0, 20),
+            ZIndex = 53,
         })
         titleLabel.Parent = card
 
@@ -845,6 +848,7 @@ function TakoGlass:CreateTab(name)
             TextTruncate = Enum.TextTruncate.AtEnd,
             Position = UDim2.new(0, 0, 0, 22),
             Size = UDim2.new(1, -80, 0, 18),
+            ZIndex = 53,
         })
         descLabel.Parent = card
 
@@ -852,6 +856,7 @@ function TakoGlass:CreateTab(name)
             BackgroundTransparency = 1,
             Position = UDim2.new(0, 0, 0, 44),
             Size = UDim2.new(1, 0, 0, 0),
+            ZIndex = 53,
         })
         content.Parent = card
 
@@ -875,7 +880,7 @@ function TakoGlass:CreateTab(name)
 
         function section:ApplyTheme(theme)
             card.BackgroundColor3 = theme.CardBg
-            card.BackgroundTransparency = GetCardTransparency(self.Window.Transparent)
+            card.BackgroundTransparency = CardAlpha(self.Window.Transparent)
             stroke.Color = theme.StrokeSoft
             titleLabel.TextColor3 = theme.Text
             descLabel.TextColor3 = theme.SubText
@@ -902,6 +907,7 @@ function TakoGlass:CreateTab(name)
             local row = Create("Frame", {
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 22),
+                ZIndex = 54,
             })
             row.Parent = self.Content
 
@@ -912,16 +918,18 @@ function TakoGlass:CreateTab(name)
                 TextColor3 = theme.Text,
                 TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Size = UDim2.new(1, -60, 1, 0),
+                Size = UDim2.new(1, -70, 1, 0),
+                ZIndex = 55,
             })
             label.Parent = row
 
             local pill = Create("Frame", {
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 48, 0, 22),
+                Size = UDim2.new(0, 50, 0, 22),
                 BackgroundColor3 = self.Window.Flags[flag] and theme.Accent or theme.ElementBg,
                 BorderSizePixel = 0,
+                ZIndex = 55,
             })
             pill.Parent = row
             Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = pill })
@@ -929,10 +937,11 @@ function TakoGlass:CreateTab(name)
             local knob = Create("Frame", {
                 Size = UDim2.new(0, 18, 0, 18),
                 Position = self.Window.Flags[flag]
-                    and UDim2.new(1, -20, 0.5, -9)
-                    or  UDim2.new(0, 2, 0.5, -9),
+                    and UDim2.new(1, -22, 0.5, -9)
+                    or  UDim2.new(0, 4, 0.5, -9),
                 BackgroundColor3 = theme.Text,
                 BorderSizePixel = 0,
+                ZIndex = 56,
             })
             knob.Parent = pill
             Create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = knob })
@@ -952,8 +961,8 @@ function TakoGlass:CreateTab(name)
                 Ease(pill, { BackgroundColor3 = v and theme.Accent or theme.ElementBg }, 0.14)
                 Ease(knob, {
                     Position = v
-                        and UDim2.new(1, -20, 0.5, -9)
-                        or  UDim2.new(0, 2, 0.5, -9)
+                        and UDim2.new(1, -22, 0.5, -9)
+                        or  UDim2.new(0, 4, 0.5, -9)
                 }, 0.14)
 
                 callback(v)
@@ -996,6 +1005,7 @@ function TakoGlass:CreateTab(name)
             local frame = Create("Frame", {
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 34),
+                ZIndex = 54,
             })
             frame.Parent = self.Content
 
@@ -1007,6 +1017,7 @@ function TakoGlass:CreateTab(name)
                 TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Size = UDim2.new(1, -80, 0, 18),
+                ZIndex = 55,
             })
             label.Parent = frame
 
@@ -1019,7 +1030,8 @@ function TakoGlass:CreateTab(name)
                 TextXAlignment = Enum.TextXAlignment.Right,
                 AnchorPoint = Vector2.new(1, 0),
                 Position = UDim2.new(1, -4, 0, 0),
-                Size = UDim2.new(0, 70, 0, 18), -- fixed width to avoid overlap
+                Size = UDim2.new(0, 70, 0, 18),
+                ZIndex = 55,
             })
             valueLabel.Parent = frame
 
@@ -1028,6 +1040,7 @@ function TakoGlass:CreateTab(name)
                 BorderSizePixel = 0,
                 Size = UDim2.new(1, 0, 0, 4),
                 Position = UDim2.new(0, 0, 0, 22),
+                ZIndex = 55,
             })
             bar.Parent = frame
             Create("UICorner", { CornerRadius = UDim.new(0, 3), Parent = bar })
@@ -1040,6 +1053,7 @@ function TakoGlass:CreateTab(name)
                 BackgroundColor3 = theme.Accent,
                 BorderSizePixel = 0,
                 Size = UDim2.new(toAlpha(self.Window.Flags[flag]), 0, 1, 0),
+                ZIndex = 56,
             })
             fill.Parent = bar
             Create("UICorner", { CornerRadius = UDim.new(0, 3), Parent = fill })
@@ -1136,6 +1150,7 @@ function TakoGlass:CreateTab(name)
             local row = Create("Frame", {
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 30),
+                ZIndex = 54,
             })
             row.Parent = self.Content
 
@@ -1147,6 +1162,7 @@ function TakoGlass:CreateTab(name)
                 TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Size = UDim2.new(0.4, 0, 1, 0),
+                ZIndex = 55,
             })
             label.Parent = row
 
@@ -1161,6 +1177,7 @@ function TakoGlass:CreateTab(name)
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
                 Size = UDim2.new(0.6, 0, 0, 24),
+                ZIndex = 55,
             })
             button.Parent = row
             Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = button })
@@ -1173,7 +1190,7 @@ function TakoGlass:CreateTab(name)
                 AnchorPoint = Vector2.new(1, 0),
                 Position = UDim2.new(1, 0, 1, 2),
                 Size = UDim2.new(0, 180, 0, 0),
-                ZIndex = 10,
+                ZIndex = 90,
             })
             listFrame.Parent = row
             Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = listFrame })
@@ -1190,7 +1207,7 @@ function TakoGlass:CreateTab(name)
                 Size = UDim2.new(1, 0, 1, 0),
                 CanvasSize = UDim2.new(0, 0, 0, 0),
                 ScrollBarThickness = 3,
-                ZIndex = 11,
+                ZIndex = 91,
             })
             scroll.Parent = listFrame
 
@@ -1215,7 +1232,7 @@ function TakoGlass:CreateTab(name)
                         TextSize = 13,
                         TextColor3 = theme.Text,
                         Size = UDim2.new(1, -6, 0, 22),
-                        ZIndex = 12,
+                        ZIndex = 92,
                     })
                     optBtn.Parent = scroll
 
@@ -1243,7 +1260,6 @@ function TakoGlass:CreateTab(name)
                 listFrame.Visible = not listFrame.Visible
             end)
 
-            -- one outside-close handler per window
             if not self.Window._dropdownCloser then
                 self.Window._dropdownCloser = UserInputService.InputBegan:Connect(function(input, gpe)
                     if gpe then return end
@@ -1316,6 +1332,7 @@ function TakoGlass:CreateTab(name)
             local row = Create("Frame", {
                 BackgroundTransparency = 1,
                 Size = UDim2.new(1, 0, 0, 30),
+                ZIndex = 54,
             })
             row.Parent = self.Content
 
@@ -1327,6 +1344,7 @@ function TakoGlass:CreateTab(name)
                 TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Size = UDim2.new(0.35, 0, 1, 0),
+                ZIndex = 55,
             })
             label.Parent = row
 
@@ -1343,6 +1361,7 @@ function TakoGlass:CreateTab(name)
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
                 Size = UDim2.new(0.65, 0, 0, 24),
+                ZIndex = 55,
             })
             box.Parent = row
             Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = box })
@@ -1396,6 +1415,7 @@ function TakoGlass:CreateTab(name)
                 TextSize = 13,
                 TextColor3 = theme.Text,
                 Size = UDim2.new(1, 0, 0, 24),
+                ZIndex = 54,
             })
             btn.Parent = self.Content
             Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = btn })
