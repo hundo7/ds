@@ -1,11 +1,11 @@
--- TakoGlass UI v6
--- Glass-style Roblox UI library
+-- TakoGlass UI v7
+-- Glass-style Roblox UI library (WindUI-like)
 -- - Tabs, sections, toggles, sliders, dropdowns, inputs, buttons
 -- - Config saving (if executor supports file IO)
 -- - Full color customization via SetTheme / SetThemeColors
 -- - Toggle key with debounce, optional blur
 -- - Mobile + PC input support
--- - Fixed tab text visibility, transparency, layout, and edge cases
+-- - Fixed tab text visibility, close button, transparency, offsets & logic
 
 --------------------------------------------------
 -- Services & client guard
@@ -49,7 +49,6 @@ local DEFAULT_THEME = "Dark"
 local MAX_NOTIF     = 5
 local RADIUS        = 10
 
--- Slightly higher alpha for better readability on transparent modes
 local Themes = {
     Dark = {
         Name        = "Dark",
@@ -161,6 +160,11 @@ local function LoadConfig(name)
     return decoded or {}
 end
 
+-- unified card transparency for glass look (sections + notifications)
+local function GetCardTransparency(isTransparent)
+    return isTransparent and 0.25 or 0.06
+end
+
 --------------------------------------------------
 -- Blur helper
 --------------------------------------------------
@@ -179,6 +183,9 @@ end
 --------------------------------------------------
 -- Notifications
 --------------------------------------------------
+
+-- last theme used (so notifications match window)
+local _currentThemeName = DEFAULT_THEME
 
 local function GetNotifyGui()
     local pg  = GetPlayerGui()
@@ -217,7 +224,7 @@ function TakoGlass.Notify(title, message, duration)
     local holder = gui:FindFirstChild("Holder")
     if not holder then return end
 
-    local theme = Themes[DEFAULT_THEME]
+    local theme = Themes[_currentThemeName] or Themes[DEFAULT_THEME]
 
     -- limit stack
     local stack = {}
@@ -232,7 +239,7 @@ function TakoGlass.Notify(title, message, duration)
 
     local card = Create("Frame", {
         BackgroundColor3 = theme.CardBg,
-        BackgroundTransparency = 0.04,
+        BackgroundTransparency = GetCardTransparency(true), -- same glass as sections in transparent mode
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 0),
         ZIndex = 100,
@@ -345,6 +352,8 @@ function TakoGlass:CreateWindow(opts)
     local theme    = Themes[self.ThemeName]
     local playerGui= GetPlayerGui()
 
+    _currentThemeName = self.ThemeName
+
     self.BlurObject = GetBlur()
     self.BlurObject.Size = self.BlurSize
     self.BlurObject.Enabled = self.UseBlur
@@ -436,7 +445,7 @@ function TakoGlass:CreateWindow(opts)
         Text = "✕",
         Font = Enum.Font.GothamBold,
         TextSize = 18,
-        TextColor3 = theme.SubText,
+        TextColor3 = theme.Text,  -- ensure X is always visible
         Size = UDim2.new(0, 28, 1, 0),
         Position = UDim2.new(1, -32, 0, 0),
     })
@@ -532,6 +541,7 @@ function TakoGlass:CreateWindow(opts)
         BorderSizePixel = 0,
         Position = UDim2.new(0, 0, 0, 44),
         Size = UDim2.new(0, self.SidebarWidth, 1, -44),
+        ClipsDescendants = true,
     })
     sidebar.Parent = main
     Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = sidebar })
@@ -566,6 +576,7 @@ function TakoGlass:CreateWindow(opts)
         BackgroundTransparency = 1,
         Position = UDim2.new(0, self.SidebarWidth, 0, 44),
         Size = UDim2.new(1, -self.SidebarWidth, 1, -44),
+        ClipsDescendants = true,
     })
     content.Parent = main
 
@@ -626,6 +637,7 @@ end
 function TakoGlass:SetTheme(name)
     if not Themes[name] then return end
     self.ThemeName = name
+    _currentThemeName = name
     local theme = Themes[name]
 
     if self.Main then
@@ -661,7 +673,6 @@ function TakoGlass:SetTheme(name)
     SaveConfig(self.ConfigName, self.Config)
 end
 
--- Fully customize current theme colors at runtime
 function TakoGlass:SetThemeColors(colors)
     colors = colors or {}
     local theme = Themes[self.ThemeName]
@@ -686,11 +697,16 @@ function TakoGlass:CreateTab(name)
         Text = name,
         Font = Enum.Font.Gotham,
         TextSize = 13,
-        TextColor3 = theme.Text, -- main text color for visibility
-        Size = UDim2.new(1, 0, 0, 28),
+        TextColor3 = theme.Text,
+        Size = UDim2.new(1, 0, 0, 30),
         TextXAlignment = Enum.TextXAlignment.Left,
     })
     button.Parent = self.TabHolder
+
+    Create("UIPadding", {
+        PaddingLeft = UDim.new(0, 10),
+        Parent = button,
+    })
 
     local buttonBg = Create("Frame", {
         BackgroundColor3 = theme.SidebarBg,
@@ -745,7 +761,7 @@ function TakoGlass:CreateTab(name)
         self.Page.Visible = true
         Ease(self.ButtonBg, {
             BackgroundTransparency = 0,
-            BackgroundColor3 = Themes[self.Window.ThemeName].ElementBg
+            BackgroundColor3 = Themes[self.Window.ThemeName].CardBg
         }, 0.12)
     end
 
@@ -761,7 +777,7 @@ function TakoGlass:CreateTab(name)
 
     button.MouseEnter:Connect(function()
         if not page.Visible then
-            Ease(buttonBg, { BackgroundTransparency = 0.2 }, 0.1)
+            Ease(buttonBg, { BackgroundTransparency = 0.3 }, 0.1)
         end
     end)
     button.MouseLeave:Connect(function()
@@ -787,9 +803,9 @@ function TakoGlass:CreateTab(name)
 
         local card = Create("Frame", {
             BackgroundColor3 = theme.CardBg,
-            BackgroundTransparency = self.Window.Transparent and 0.25 or 0.06,
+            BackgroundTransparency = GetCardTransparency(self.Window.Transparent),
             BorderSizePixel = 0,
-            Size = UDim2.new(1, 0, 0, 90),
+            Size = UDim2.new(1, 0, 0, 60),
         })
         card.Parent = self.Page
         Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = card })
@@ -859,7 +875,7 @@ function TakoGlass:CreateTab(name)
 
         function section:ApplyTheme(theme)
             card.BackgroundColor3 = theme.CardBg
-            card.BackgroundTransparency = self.Window.Transparent and 0.25 or 0.06
+            card.BackgroundTransparency = GetCardTransparency(self.Window.Transparent)
             stroke.Color = theme.StrokeSoft
             titleLabel.TextColor3 = theme.Text
             descLabel.TextColor3 = theme.SubText
@@ -903,7 +919,7 @@ function TakoGlass:CreateTab(name)
             local pill = Create("Frame", {
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, 0, 0.5, 0),
-                Size = UDim2.new(0, 46, 0, 22),
+                Size = UDim2.new(0, 48, 0, 22),
                 BackgroundColor3 = self.Window.Flags[flag] and theme.Accent or theme.ElementBg,
                 BorderSizePixel = 0,
             })
@@ -990,7 +1006,7 @@ function TakoGlass:CreateTab(name)
                 TextColor3 = theme.Text,
                 TextSize = 13,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Size = UDim2.new(0.6, 0, 0, 18),
+                Size = UDim2.new(1, -80, 0, 18),
             })
             label.Parent = frame
 
@@ -1002,8 +1018,8 @@ function TakoGlass:CreateTab(name)
                 TextSize = 12,
                 TextXAlignment = Enum.TextXAlignment.Right,
                 AnchorPoint = Vector2.new(1, 0),
-                Position = UDim2.new(1, 0, 0, 0),
-                Size = UDim2.new(0.4, 0, 0, 18),
+                Position = UDim2.new(1, -4, 0, 0),
+                Size = UDim2.new(0, 70, 0, 18), -- fixed width to avoid overlap
             })
             valueLabel.Parent = frame
 
@@ -1091,7 +1107,9 @@ function TakoGlass:CreateTab(name)
 
             return {
                 Set = function(v)
-                    setFromAlpha(toAlpha(v))
+                    local clamped = math.clamp(v, min, max)
+                    local stepped = math.floor(clamped / step + 0.5) * step
+                    setFromAlpha(toAlpha(stepped))
                 end
             }
         end
@@ -1104,13 +1122,13 @@ function TakoGlass:CreateTab(name)
             opt = opt or {}
             local name     = opt.Name or "Dropdown"
             local list     = opt.Options or {}
-            local default  = opt.Default or list[1]
+            local default  = opt.Default ~= nil and opt.Default or list[1]
             local flag     = opt.Flag or ("TG_Drop_" .. name)
             local callback = opt.Callback or function() end
 
             local theme = Themes[self.Window.ThemeName]
 
-            if self.Window.Config[flag] == nil and default ~= nil then
+            if self.Window.Config[flag] == nil then
                 self.Window.Config[flag] = default
             end
             self.Window.Flags[flag] = self.Window.Config[flag]
@@ -1155,6 +1173,7 @@ function TakoGlass:CreateTab(name)
                 AnchorPoint = Vector2.new(1, 0),
                 Position = UDim2.new(1, 0, 1, 2),
                 Size = UDim2.new(0, 180, 0, 0),
+                ZIndex = 10,
             })
             listFrame.Parent = row
             Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = listFrame })
@@ -1171,6 +1190,7 @@ function TakoGlass:CreateTab(name)
                 Size = UDim2.new(1, 0, 1, 0),
                 CanvasSize = UDim2.new(0, 0, 0, 0),
                 ScrollBarThickness = 3,
+                ZIndex = 11,
             })
             scroll.Parent = listFrame
 
@@ -1195,6 +1215,7 @@ function TakoGlass:CreateTab(name)
                         TextSize = 13,
                         TextColor3 = theme.Text,
                         Size = UDim2.new(1, -6, 0, 22),
+                        ZIndex = 12,
                     })
                     optBtn.Parent = scroll
 
