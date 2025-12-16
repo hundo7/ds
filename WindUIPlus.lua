@@ -59,10 +59,11 @@ local CONFIG_FOLDER  = "TakoGlassConfigs"
 local DEFAULT_THEME  = "Dark"
 local MAX_NOTIF      = 5
 local RADIUS         = 8
-local ICON_FONT      = Enum.Font.Gotham  -- For icons
+local ICON_FONT      = Enum.Font.MaterialIcons -- For icons
 local DEFAULT_FONT   = Enum.Font.Gotham
 local ELEMENT_HEIGHT = 22
 local ELEMENT_SPACING= 6
+
 local _windowInstance  = nil -- Only one window allowed
 local _currentThemeName= DEFAULT_THEME
 local _takoGuiRoot     = nil -- ScreenGui for the main window
@@ -745,8 +746,8 @@ function TakoGlass:CreateWindow(opts)
             input.Handled = true
             if self.IsOpen then
                 Ease(main, { BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0) }, 0.16)
-                task.delay(0.16, function() SetOpen(false) end)
-            else
+                task.delay(0.16, function() SetOpen(false) end
+)            else
                 main.Size = UDim2.new(0, 0, 0, 0)
                 main.BackgroundTransparency = theme.WindowAlpha
                 SetOpen(true)
@@ -1751,138 +1752,22 @@ function TakoGlass:CreateTab(name, icon) -- (Fix 1) Tab Icons
             LinkElement(el)
             return el
         end
-function section:AddButton(opt)
-    opt = opt or {}
-    local name     = opt.Name or "Button"
-    local desc     = opt.Desc or ""
-    local icon     = opt.Icon -- optional icon name/ID
-    local iconThemed = opt.IconThemed ~= false
-    local color    = opt.Color or "Accent" -- 'Accent', 'ElementBg', 'Transparent'
-    local callback = opt.Callback or function() end
-    local locked   = opt.Locked or false
+        
+        -- Add all section methods
+        section.AddButton = function(self, opt)
+            opt = opt or {}
+            local name     = opt.Name or "Button"
+            local desc     = opt.Desc or ""
+            local icon     = opt.Icon -- optional icon name/ID
+            local iconThemed = opt.IconThemed ~= false
+            local color    = opt.Color or "Accent" -- 'Accent', 'ElementBg', 'Transparent'
+            local callback = opt.Callback or function() end
+            local locked   = opt.Locked or false
 
-    local theme = Themes[self.Window.ThemeName]
-    
-    -- Colors
-    local normalColor, hoverColor, textColor
-    if color == "Accent" then
-        normalColor = theme.Accent
-        hoverColor = theme.AccentSoft
-        textColor = Color3.new(1, 1, 1)
-    elseif color == "Transparent" then
-        normalColor = Color3.new(1, 1, 1)
-        hoverColor = theme.ElementBg
-        textColor = theme.Text
-    else
-        normalColor = theme.ElementBg
-        hoverColor = theme.ElementBg:Lerp(Color3.new(0, 0, 0), 0.15)
-        textColor = theme.Text
-    end
-
-    local row = Create("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, desc == "" and 36 or 48),
-        ZIndex = 54,
-    })
-    row.Parent = self.Content
-
-    local button = Create("TextButton", {
-        BackgroundColor3 = normalColor,
-        BackgroundTransparency = (color == "Transparent" and 0.95) or (color == "Accent" and 0) or 0.05,
-        BorderSizePixel = 0,
-        Text = "",
-        Size = UDim2.new(1, 0, 0, desc == "" and 36 or 48),
-        ZIndex = 55,
-        AutoButtonColor = false,
-        Active = not locked,
-    })
-    button.Parent = row
-    Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = button })
-    
-    -- Icon (if provided)
-    local iconLabel
-    if icon then
-        iconLabel = Create("ImageLabel", {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(0, 20, 0, 20),
-            Position = UDim2.new(0, 10, 0.5, 0),
-            AnchorPoint = Vector2.new(0, 0.5),
-            Image = icon:match("^rbxassetid://") and icon or "",
-            ImageColor3 = iconThemed and textColor or nil,
-            ImageTransparency = iconThemed and 0 or 0.3,
-            ZIndex = 56,
-        })
-        iconLabel.Parent = button
-    end
-
-    -- Title
-    local titleLabel = Create("TextLabel", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamSemibold,
-        Text = name,
-        TextColor3 = textColor,
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Size = UDim2.new(1, icon and -35 or -20, 0, 20),
-        Position = UDim2.new(0, icon and 35 or 10, desc == "" and 0.5 or 0.3, 0),
-        AnchorPoint = Vector2.new(0, desc == "" and 0.5 or 0),
-        ZIndex = 56,
-    })
-    titleLabel.Parent = button
-
-    -- Description (optional)
-    local descLabel
-    if desc ~= "" then
-        descLabel = Create("TextLabel", {
-            BackgroundTransparency = 1,
-            Font = Enum.Font.Gotham,
-            Text = desc,
-            TextColor3 = theme.SubText,
-            TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Size = UDim2.new(1, icon and -35 or -20, 0, 16),
-            Position = UDim2.new(0, icon and 35 or 10, 0.6, 0),
-            ZIndex = 56,
-        })
-        descLabel.Parent = button
-    end
-
-    -- Hover effects
-    button.MouseEnter:Connect(function()
-        if not locked then
-            Ease(button, { BackgroundColor3 = hoverColor }, 0.12)
-            if color == "Transparent" then
-                Ease(button, { BackgroundTransparency = 0.9 }, 0.12)
-            end
-        end
-    end)
-
-    button.MouseLeave:Connect(function()
-        if not locked then
-            Ease(button, { BackgroundColor3 = normalColor }, 0.12)
-            if color == "Transparent" then
-                Ease(button, { BackgroundTransparency = 0.95 }, 0.12)
-            end
-        end
-    end)
-
-    -- Click
-    button.MouseButton1Click:Connect(function()
-        if not locked then
-            -- Click animation
-            Ease(button, { BackgroundTransparency = (color == "Transparent" and 0.8) or 0.15 }, 0.08)
-            task.wait(0.08)
-            Ease(button, { BackgroundTransparency = (color == "Transparent" and 0.95) or (color == "Accent" and 0) or 0.05 }, 0.12)
+            local theme = Themes[self.Window.ThemeName]
             
-            -- Call callback
-            callback()
-        end
-    end)
-
-    local el = {
-        Gui = row,
-        ApplyTheme = function(newTheme)
-            theme = newTheme
+            -- Colors
+            local normalColor, hoverColor, textColor
             if color == "Accent" then
                 normalColor = theme.Accent
                 hoverColor = theme.AccentSoft
@@ -1896,28 +1781,65 @@ function section:AddButton(opt)
                 hoverColor = theme.ElementBg:Lerp(Color3.new(0, 0, 0), 0.15)
                 textColor = theme.Text
             end
+
+            local row = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, desc == "" and 36 or 48),
+                ZIndex = 54,
+            })
+            row.Parent = self.Content
+
+            local button = Create("TextButton", {
+                BackgroundColor3 = normalColor,
+                BackgroundTransparency = (color == "Transparent" and 0.95) or (color == "Accent" and 0) or 0.05,
+                BorderSizePixel = 0,
+                Text = "",
+                Size = UDim2.new(1, 0, 0, desc == "" and 36 or 48),
+                ZIndex = 55,
+                AutoButtonColor = false,
+                Active = not locked,
+            })
+            button.Parent = row
+            Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = button })
             
-            button.BackgroundColor3 = normalColor
-            titleLabel.TextColor3 = textColor
-            if descLabel then
-                descLabel.TextColor3 = theme.SubText
+            -- Icon (if provided)
+            local iconLabel
+            if icon then
+                iconLabel = Create("ImageLabel", {
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(0, 20, 0, 20),
+                    Position = UDim2.new(0, 10, 0.5, 0),
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Image = icon:match("^rbxassetid://") and icon or "",
+                    ImageColor3 = iconThemed and textColor or nil,
+                    ImageTransparency = iconThemed and 0 or 0.3,
+                    ZIndex = 56,
+                })
+                iconLabel.Parent = button
             end
-            if iconLabel and iconThemed then
-                iconLabel.ImageColor3 = textColor
-            end
-        end,
-        SetText = function(newText)
-            titleLabel.Text = newText
-        end,
-        SetDesc = function(newDesc)
-            if descLabel then
-                descLabel.Text = newDesc
-            elseif newDesc ~= "" then
-                -- Create desc label if it didn't exist
+
+            -- Title
+            local titleLabel = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamSemibold,
+                Text = name,
+                TextColor3 = textColor,
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Size = UDim2.new(1, icon and -35 or -20, 0, 20),
+                Position = UDim2.new(0, icon and 35 or 10, desc == "" and 0.5 or 0.3, 0),
+                AnchorPoint = Vector2.new(0, desc == "" and 0.5 or 0),
+                ZIndex = 56,
+            })
+            titleLabel.Parent = button
+
+            -- Description (optional)
+            local descLabel
+            if desc ~= "" then
                 descLabel = Create("TextLabel", {
                     BackgroundTransparency = 1,
                     Font = Enum.Font.Gotham,
-                    Text = newDesc,
+                    Text = desc,
                     TextColor3 = theme.SubText,
                     TextSize = 12,
                     TextXAlignment = Enum.TextXAlignment.Left,
@@ -1926,1015 +1848,1038 @@ function section:AddButton(opt)
                     ZIndex = 56,
                 })
                 descLabel.Parent = button
-                row.Size = UDim2.new(1, 0, 0, 48)
-                button.Size = UDim2.new(1, 0, 0, 48)
-                titleLabel.Position = UDim2.new(0, icon and 35 or 10, 0.3, 0)
-                titleLabel.AnchorPoint = Vector2.new(0, 0)
             end
-        end,
-        SetLocked = function(isLocked)
-            locked = isLocked
-            button.Active = not locked
-            button.BackgroundTransparency = locked and 0.9 or ((color == "Transparent" and 0.95) or (color == "Accent" and 0) or 0.05)
-        end,
-    }
-    
-    if locked then
-        el.SetLocked(true)
-    end
-    
-    table.insert(self.Elements, el)
-    table.insert(section.Elements, el)
-    return el
-end
-        function section:AddInput(opt)
-    opt = opt or {}
-    local name      = opt.Name or "Input"
-    local desc      = opt.Desc or ""
-    local default   = opt.Default or ""
-    local flag      = opt.Flag or ("TG_Inp_" .. name)
-    local placeholder = opt.Placeholder or "Type here..."
-    local isNumeric = opt.Numeric or false
-    local clearOnFocus = opt.ClearOnFocus or false
-    local multiline  = opt.Multiline or false
-    local callback  = opt.Callback or function() end
-    local icon      = opt.Icon -- optional
-    local iconThemed = opt.IconThemed ~= false
 
-    local theme = Themes[self.Window.ThemeName]
-
-    if self.Window.Config[flag] == nil then
-        self.Window.Config[flag] = default
-    end
-    local text = self.Window.Config[flag]
-    self.Window.Flags[flag] = text
-
-    local row = Create("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, desc == "" and 42 or 54),
-        ZIndex = 54,
-    })
-    row.Parent = self.Content
-
-    -- Title
-    if name ~= "" then
-        local title = Create("TextLabel", {
-            BackgroundTransparency = 1,
-            Font = Enum.Font.GothamSemibold,
-            Text = name,
-            TextColor3 = theme.Text,
-            TextSize = 14,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Size = UDim2.new(1, 0, 0, desc == "" and 0 or 16),
-            Position = UDim2.new(0, 0, 0, desc == "" and -18 or 0),
-            ZIndex = 55,
-        })
-        title.Parent = row
-    end
-
-    -- Description
-    if desc ~= "" then
-        local descLabel = Create("TextLabel", {
-            BackgroundTransparency = 1,
-            Font = Enum.Font.Gotham,
-            Text = desc,
-            TextColor3 = theme.SubText,
-            TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Size = UDim2.new(1, 0, 0, 14),
-            Position = UDim2.new(0, 0, 0, 18),
-            ZIndex = 55,
-        })
-        descLabel.Parent = row
-    end
-
-    -- Input container
-    local inputContainer = Create("Frame", {
-        BackgroundColor3 = theme.ElementBg,
-        BackgroundTransparency = 0.05,
-        BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, multiline and 80 or 36),
-        Position = UDim2.new(0, 0, 0, desc == "" and 6 or (desc == "" and 24 or 36)),
-        ZIndex = 55,
-    })
-    inputContainer.Parent = row
-    Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = inputContainer })
-
-    -- Icon (optional)
-    local iconLabel
-    if icon then
-        iconLabel = Create("ImageLabel", {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(0, 18, 0, 18),
-            Position = UDim2.new(0, 8, 0.5, 0),
-            AnchorPoint = Vector2.new(0, 0.5),
-            Image = icon:match("^rbxassetid://") and icon or "",
-            ImageColor3 = iconThemed and theme.Text or nil,
-            ImageTransparency = iconThemed and 0 or 0.4,
-            ZIndex = 56,
-        })
-        iconLabel.Parent = inputContainer
-    end
-
-    -- TextBox
-    local input = Create("TextBox", {
-        BackgroundTransparency = 1,
-        Text = text,
-        Font = Enum.Font.Gotham,
-        TextSize = 13,
-        TextColor3 = theme.Text,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
-        PlaceholderText = placeholder,
-        PlaceholderColor3 = theme.SubText,
-        ClearTextOnFocus = clearOnFocus,
-        MultiLine = multiline,
-        TextWrapped = multiline,
-        Size = UDim2.new(1, icon and -32 or -16, multiline and 1 or 1, 0),
-        Position = UDim2.new(0, icon and 32 or 8, 0, multiline and 4 or 0),
-        ZIndex = 56,
-    })
-    input.Parent = inputContainer
-
-    if multiline then
-        Create("UIPadding", {
-            PaddingTop = UDim.new(0, 4),
-            PaddingBottom = UDim.new(0, 4),
-            Parent = input,
-        })
-    end
-
-    -- Focus effects
-    local originalSize = inputContainer.Size
-    input.Focused:Connect(function()
-        Ease(inputContainer, {
-            Size = UDim2.new(1, 2, 0, multiline and 82 or 38),
-            Position = UDim2.new(0, -1, 0, desc == "" and 5 or (desc == "" and 23 or 35))
-        }, 0.12)
-    end)
-
-    input.FocusLost:Connect(function()
-        Ease(inputContainer, {
-            Size = originalSize,
-            Position = UDim2.new(0, 0, 0, desc == "" and 6 or (desc == "" and 24 or 36))
-        }, 0.12)
-    end)
-
-    local function UpdateValue()
-        local newValue = isNumeric and tonumber(input.Text) or input.Text
-        if isNumeric and newValue == nil then
-            -- Reset to old value on invalid input
-            input.Text = text
-            return
-        end
-        
-        text = tostring(newValue)
-        self.Window.Flags[flag] = newValue
-        self.Window.Config[flag] = newValue
-        SaveConfig(self.Window.ConfigName, self.Window.Config)
-        callback(newValue)
-    end
-
-    input.FocusLost:Connect(function(enterPressed)
-        UpdateValue()
-    end)
-
-    -- Live updates for multiline
-    if multiline then
-        input:GetPropertyChangedSignal("Text"):Connect(function()
-            task.defer(function()
-                if not input:IsFocused() then
-                    UpdateValue()
+            -- Hover effects
+            button.MouseEnter:Connect(function()
+                if not locked then
+                    Ease(button, { BackgroundColor3 = hoverColor }, 0.12)
+                    if color == "Transparent" then
+                        Ease(button, { BackgroundTransparency = 0.9 }, 0.12)
+                    end
                 end
             end)
-        end)
-    end
 
-    local el = {
-        Gui = row,
-        ApplyTheme = function(newTheme)
-            theme = newTheme
+            button.MouseLeave:Connect(function()
+                if not locked then
+                    Ease(button, { BackgroundColor3 = normalColor }, 0.12)
+                    if color == "Transparent" then
+                        Ease(button, { BackgroundTransparency = 0.95 }, 0.12)
+                    end
+                end
+            end)
+
+            -- Click
+            button.MouseButton1Click:Connect(function()
+                if not locked then
+                    -- Click animation
+                    Ease(button, { BackgroundTransparency = (color == "Transparent" and 0.8) or 0.15 }, 0.08)
+                    task.wait(0.08)
+                    Ease(button, { BackgroundTransparency = (color == "Transparent" and 0.95) or (color == "Accent" and 0) or 0.05 }, 0.12)
+                    
+                    -- Call callback
+                    callback()
+                end
+            end)
+
+            local el = {
+                Gui = row,
+                ApplyTheme = function(newTheme)
+                    theme = newTheme
+                    if color == "Accent" then
+                        normalColor = theme.Accent
+                        hoverColor = theme.AccentSoft
+                        textColor = Color3.new(1, 1, 1)
+                    elseif color == "Transparent" then
+                        normalColor = Color3.new(1, 1, 1)
+                        hoverColor = theme.ElementBg
+                        textColor = theme.Text
+                    else
+                        normalColor = theme.ElementBg
+                        hoverColor = theme.ElementBg:Lerp(Color3.new(0, 0, 0), 0.15)
+                        textColor = theme.Text
+                    end
+                    
+                    button.BackgroundColor3 = normalColor
+                    titleLabel.TextColor3 = textColor
+                    if descLabel then
+                        descLabel.TextColor3 = theme.SubText
+                    end
+                    if iconLabel and iconThemed then
+                        iconLabel.ImageColor3 = textColor
+                    end
+                end,
+                SetText = function(newText)
+                    titleLabel.Text = newText
+                end,
+                SetDesc = function(newDesc)
+                    if descLabel then
+                        descLabel.Text = newDesc
+                    elseif newDesc ~= "" then
+                        -- Create desc label if it didn't exist
+                        descLabel = Create("TextLabel", {
+                            BackgroundTransparency = 1,
+                            Font = Enum.Font.Gotham,
+                            Text = newDesc,
+                            TextColor3 = theme.SubText,
+                            TextSize = 12,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            Size = UDim2.new(1, icon and -35 or -20, 0, 16),
+                            Position = UDim2.new(0, icon and 35 or 10, 0.6, 0),
+                            ZIndex = 56,
+                        })
+                        descLabel.Parent = button
+                        row.Size = UDim2.new(1, 0, 0, 48)
+                        button.Size = UDim2.new(1, 0, 0, 48)
+                        titleLabel.Position = UDim2.new(0, icon and 35 or 10, 0.3, 0)
+                        titleLabel.AnchorPoint = Vector2.new(0, 0)
+                    end
+                end,
+                SetLocked = function(isLocked)
+                    locked = isLocked
+                    button.Active = not locked
+                    button.BackgroundTransparency = locked and 0.9 or ((color == "Transparent" and 0.95) or (color == "Accent" and 0) or 0.05)
+                end,
+            }
+            
+            if locked then
+                el.SetLocked(true)
+            end
+            
+            table.insert(self.Elements, el)
+            table.insert(section.Elements, el)
+            LinkElement(el)
+            return el
+        end
+        
+        section.AddInput = function(self, opt)
+            opt = opt or {}
+            local name      = opt.Name or "Input"
+            local desc      = opt.Desc or ""
+            local default   = opt.Default or ""
+            local flag      = opt.Flag or ("TG_Inp_" .. name)
+            local placeholder = opt.Placeholder or "Type here..."
+            local isNumeric = opt.Numeric or false
+            local clearOnFocus = opt.ClearOnFocus or false
+            local multiline  = opt.Multiline or false
+            local callback  = opt.Callback or function() end
+            local icon      = opt.Icon -- optional
+            local iconThemed = opt.IconThemed ~= false
+
+            local theme = Themes[self.Window.ThemeName]
+
+            if self.Window.Config[flag] == nil then
+                self.Window.Config[flag] = default
+            end
+            local text = self.Window.Config[flag]
+            self.Window.Flags[flag] = text
+
+            local row = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, desc == "" and 42 or 54),
+                ZIndex = 54,
+            })
+            row.Parent = self.Content
+
+            -- Title
             if name ~= "" then
-                local title = row:FindFirstChildWhichIsA("TextLabel")
-                if title then title.TextColor3 = theme.Text end
-            end
-            if desc ~= "" then
-                local descLabel = row:FindFirstChildWhichIsA("TextLabel", true)
-                if descLabel then descLabel.TextColor3 = theme.SubText end
-            end
-            inputContainer.BackgroundColor3 = theme.ElementBg
-            input.TextColor3 = theme.Text
-            input.PlaceholderColor3 = theme.SubText
-            if iconLabel and iconThemed then
-                iconLabel.ImageColor3 = theme.Text
-            end
-        end,
-        Set = function(newValue)
-            local finalValue = isNumeric and tonumber(newValue) or tostring(newValue)
-            if finalValue ~= nil then
-                text = tostring(finalValue)
-                input.Text = text
-                self.Window.Flags[flag] = finalValue
-                self.Window.Config[flag] = finalValue
-                SaveConfig(self.Window.ConfigName, self.Window.Config)
-                callback(finalValue)
-            end
-        end,
-        Get = function() 
-            local value = isNumeric and tonumber(input.Text) or input.Text
-            return value or (isNumeric and 0 or "")
-        end,
-        SetPlaceholder = function(newPlaceholder)
-            input.PlaceholderText = newPlaceholder
-        end,
-    }
-    
-    table.insert(self.Elements, el)
-    table.insert(section.Elements, el)
-    return el
-end
-        function section:AddCodeBlock(opt)
-    opt = opt or {}
-    local title = opt.Title or "Code"
-    local code = opt.Code or ""
-    local language = opt.Language or "lua" -- 'lua', 'python', 'js', etc.
-    local copyable = opt.Copyable ~= false
-    local callback = opt.Callback or function() end
-
-    local theme = Themes[self.Window.ThemeName]
-    
-    -- Syntax highlighting colors
-    local syntaxColors = {
-        keyword = Color3.fromRGB(255, 119, 168),    -- pink
-        string = Color3.fromRGB(152, 195, 121),     -- green
-        number = Color3.fromRGB(255, 184, 108),     -- orange
-        comment = Color3.fromRGB(150, 152, 150),    -- gray
-        functionName = Color3.fromRGB(97, 175, 239), -- blue
-        operator = Color3.fromRGB(198, 120, 221),   -- purple
-    }
-
-    local function highlightLua(codeText)
-        -- Simple Lua syntax highlighter
-        local patterns = {
-            {pattern = "%-%-%[%[.*%]%]", color = syntaxColors.comment},  -- multi-line comment
-            {pattern = "%-%-[^\n]*", color = syntaxColors.comment},      -- single line comment
-            {pattern = "\".-[^\\]\"", color = syntaxColors.string},      -- double quotes
-            {pattern = "\'.-[^\\]\'", color = syntaxColors.string},      -- single quotes
-            {pattern = "\\b(%d+%.?%d*)\\b", color = syntaxColors.number}, -- numbers
-            {pattern = "\\b(function|local|if|then|else|elseif|end|for|while|repeat|until|return|break|do|in|and|or|not)\\b", color = syntaxColors.keyword},
-            {pattern = "\\b([%w_]+)%s*%(", color = syntaxColors.functionName}, -- function calls
-            {pattern = "[%+%-%*/%%%^#=<>~]", color = syntaxColors.operator}, -- operators
-        }
-        
-        local result = codeText
-        for _, pat in ipairs(patterns) do
-            result = string.gsub(result, pat.pattern, function(match)
-                return string.format('<font color="#%s">%s</font>', pat.color:ToHex(), match)
-            end)
-        end
-        return result
-    end
-
-    local row = Create("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        ZIndex = 54,
-    })
-    row.Parent = self.Content
-
-    -- Title bar
-    local titleBar = Create("Frame", {
-        BackgroundColor3 = theme.CardBg,
-        BackgroundTransparency = CardAlpha(self.Window.Transparent) + 0.1,
-        Size = UDim2.new(1, 0, 0, 28),
-        ZIndex = 55,
-    })
-    titleBar.Parent = row
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, RADIUS),
-        Parent = titleBar
-    })
-
-    local titleLabel = Create("TextLabel", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamSemibold,
-        Text = title,
-        TextColor3 = theme.Text,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Size = UDim2.new(1, copyable and -30 or -10, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        ZIndex = 56,
-    })
-    titleLabel.Parent = titleBar
-
-    -- Language badge
-    local langBadge = Create("TextLabel", {
-        BackgroundColor3 = theme.Accent,
-        BackgroundTransparency = 0.2,
-        Text = string.upper(language),
-        Font = Enum.Font.Gotham,
-        TextSize = 10,
-        TextColor3 = Color3.new(1, 1, 1),
-        Size = UDim2.new(0, 40, 0, 16),
-        Position = UDim2.new(1, -50, 0.5, 0),
-        AnchorPoint = Vector2.new(1, 0.5),
-        TextXAlignment = Enum.TextXAlignment.Center,
-        ZIndex = 57,
-    })
-    langBadge.Parent = titleBar
-    Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = langBadge })
-
-    -- Copy button
-    local copyButton
-    if copyable then
-        copyButton = Create("TextButton", {
-            BackgroundTransparency = 1,
-            Text = "📋",
-            Font = Enum.Font.Gotham,
-            TextSize = 14,
-            TextColor3 = theme.SubText,
-            Size = UDim2.new(0, 24, 0, 24),
-            Position = UDim2.new(1, -32, 0.5, 0),
-            AnchorPoint = Vector2.new(1, 0.5),
-            ZIndex = 57,
-        })
-        copyButton.Parent = titleBar
-
-        copyButton.MouseEnter:Connect(function()
-            Ease(copyButton, { TextColor3 = theme.Text }, 0.1)
-        end)
-        copyButton.MouseLeave:Connect(function()
-            Ease(copyButton, { TextColor3 = theme.SubText }, 0.1)
-        end)
-
-        copyButton.MouseButton1Click:Connect(function()
-            -- Copy to clipboard
-            if setclipboard then
-                setclipboard(code)
-            elseif toclipboard then
-                toclipboard(code)
-            end
-            
-            -- Visual feedback
-            local originalText = copyButton.Text
-            copyButton.Text = "✓"
-            copyButton.TextColor3 = Color3.fromRGB(76, 175, 80)
-            
-            callback(code)
-            
-            task.wait(1)
-            copyButton.Text = originalText
-            copyButton.TextColor3 = theme.SubText
-        end)
-    end
-
-    -- Code container
-    local codeContainer = Create("Frame", {
-        BackgroundColor3 = theme.CardBg,
-        BackgroundTransparency = CardAlpha(self.Window.Transparent),
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        Position = UDim2.new(0, 0, 0, 32),
-        ZIndex = 55,
-    })
-    codeContainer.Parent = row
-    Create("UICorner", {
-        CornerRadius = UDim.new(0, RADIUS),
-        Parent = codeContainer
-    })
-    Create("UIStroke", {
-        Color = theme.StrokeSoft,
-        Thickness = 1,
-        Transparency = 0.4,
-        Parent = codeContainer,
-    })
-
-    Create("UIPadding", {
-        PaddingTop = UDim.new(0, 8),
-        PaddingBottom = UDim.new(0, 8),
-        PaddingLeft = UDim.new(0, 12),
-        PaddingRight = UDim.new(0, 12),
-        Parent = codeContainer,
-    })
-
-    -- Code text with syntax highlighting
-    local codeText = Create("TextLabel", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.Code,
-        Text = highlightLua(code),
-        RichText = true,
-        TextColor3 = theme.Text,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-        TextWrapped = true,
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        ZIndex = 56,
-    })
-    codeText.Parent = codeContainer
-
-    -- Update row height when text changes
-    codeText:GetPropertyChangedSignal("TextBounds"):Connect(function()
-        local height = math.max(40, codeText.TextBounds.Y + 16)
-        codeContainer.Size = UDim2.new(1, 0, 0, height)
-        row.Size = UDim2.new(1, 0, 0, height + 32)
-    end)
-
-    local el = {
-        Gui = row,
-        ApplyTheme = function(newTheme)
-            theme = newTheme
-            titleBar.BackgroundColor3 = theme.CardBg
-            titleLabel.TextColor3 = theme.Text
-            langBadge.BackgroundColor3 = theme.Accent
-            codeContainer.BackgroundColor3 = theme.CardBg
-            local stroke = codeContainer:FindFirstChildOfClass("UIStroke")
-            if stroke then
-                stroke.Color = theme.StrokeSoft
-            end
-            codeText.TextColor3 = theme.Text
-            if copyButton then
-                copyButton.TextColor3 = theme.SubText
-            end
-            -- Re-highlight with new theme
-            codeText.Text = highlightLua(code)
-        end,
-        SetCode = function(newCode, newLanguage)
-            code = newCode or code
-            if newLanguage then
-                language = newLanguage
-                langBadge.Text = string.upper(language)
-            end
-            codeText.Text = highlightLua(code)
-        end,
-        GetCode = function() return code end,
-    }
-    
-    table.insert(self.Elements, el)
-    table.insert(section.Elements, el)
-    return el
-end
-        function section:AddRightClickMenu(opt)
-    opt = opt or {}
-    local target = opt.Target -- GUI element to attach menu to
-    local items = opt.Items or {} -- Table of {Name, Icon, Callback, Divider, Disabled}
-    local position = opt.Position or UDim2.new(0.5, 0, 0.5, 0)
-
-    if not target then
-        warn("AddRightClickMenu: No target specified")
-        return nil
-    end
-
-    local theme = Themes[self.Window.ThemeName]
-    local menuOpen = false
-    local menuGui
-
-    local function CreateMenu()
-        if menuGui then menuGui:Destroy() end
-        
-        menuGui = Create("Frame", {
-            Name = "RightClickMenu",
-            BackgroundColor3 = theme.CardBg,
-            BackgroundTransparency = CardAlpha(self.Window.Transparent) - 0.1,
-            BorderSizePixel = 0,
-            Size = UDim2.new(0, 180, 0, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            Position = position,
-            ZIndex = 999,
-            Visible = false,
-        })
-        menuGui.Parent = target
-        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = menuGui })
-        Create("UIStroke", {
-            Color = theme.StrokeSoft,
-            Thickness = 1,
-            Transparency = 0.2,
-            Parent = menuGui,
-        })
-
-        local layout = Create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Vertical,
-            Padding = UDim.new(0, 2),
-        })
-        layout.Parent = menuGui
-
-        Create("UIPadding", {
-            PaddingTop = UDim.new(0, 4),
-            PaddingBottom = UDim.new(0, 4),
-            PaddingLeft = UDim.new(0, 4),
-            PaddingRight = UDim.new(0, 4),
-            Parent = menuGui,
-        })
-
-        -- Add menu items
-        for _, item in ipairs(items) do
-            if item.Divider then
-                -- Divider
-                local divider = Create("Frame", {
-                    BackgroundColor3 = theme.StrokeSoft,
-                    BackgroundTransparency = 0.6,
-                    BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 1),
-                    ZIndex = 1000,
-                })
-                divider.Parent = menuGui
-            else
-                -- Menu item
-                local menuItem = Create("TextButton", {
-                    BackgroundColor3 = Color3.new(1, 1, 1),
+                local title = Create("TextLabel", {
                     BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    Text = "",
-                    Size = UDim2.new(1, 0, 0, 30),
-                    ZIndex = 1000,
-                    AutoButtonColor = false,
-                    Active = not item.Disabled,
+                    Font = Enum.Font.GothamSemibold,
+                    Text = name,
+                    TextColor3 = theme.Text,
+                    TextSize = 14,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Size = UDim2.new(1, 0, 0, desc == "" and 0 or 16),
+                    Position = UDim2.new(0, 0, 0, desc == "" and -18 or 0),
+                    ZIndex = 55,
                 })
-                menuItem.Parent = menuGui
-                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS - 2), Parent = menuItem })
+                title.Parent = row
+            end
 
-                -- Icon
-                if item.Icon then
-                    local icon = Create("ImageLabel", {
-                        BackgroundTransparency = 1,
-                        Size = UDim2.new(0, 18, 0, 18),
-                        Position = UDim2.new(0, 8, 0.5, 0),
-                        AnchorPoint = Vector2.new(0, 0.5),
-                        Image = item.Icon:match("^rbxassetid://") and item.Icon or "",
-                        ImageColor3 = item.Disabled and theme.SubText or theme.Text,
-                        ImageTransparency = item.Disabled and 0.6 or 0,
-                        ZIndex = 1001,
-                    })
-                    icon.Parent = menuItem
-                end
-
-                -- Text
-                local textLabel = Create("TextLabel", {
+            -- Description
+            if desc ~= "" then
+                local descLabel = Create("TextLabel", {
                     BackgroundTransparency = 1,
                     Font = Enum.Font.Gotham,
-                    Text = item.Name,
-                    TextColor3 = item.Disabled and theme.SubText or theme.Text,
-                    TextTransparency = item.Disabled and 0.6 or 0,
-                    TextSize = 13,
+                    Text = desc,
+                    TextColor3 = theme.SubText,
+                    TextSize = 12,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Size = UDim2.new(1, item.Icon and -30 or -10, 1, 0),
-                    Position = UDim2.new(0, item.Icon and 30 or 10, 0, 0),
-                    ZIndex = 1001,
+                    Size = UDim2.new(1, 0, 0, 14),
+                    Position = UDim2.new(0, 0, 0, 18),
+                    ZIndex = 55,
                 })
-                textLabel.Parent = menuItem
+                descLabel.Parent = row
+            end
 
-                -- Hover effect
-                if not item.Disabled then
-                    menuItem.MouseEnter:Connect(function()
-                        Ease(menuItem, { BackgroundTransparency = 0.9 }, 0.1)
-                    end)
-                    menuItem.MouseLeave:Connect(function()
-                        Ease(menuItem, { BackgroundTransparency = 1 }, 0.1)
-                    end)
+            -- Input container
+            local inputContainer = Create("Frame", {
+                BackgroundColor3 = theme.ElementBg,
+                BackgroundTransparency = 0.05,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 0, multiline and 80 or 36),
+                Position = UDim2.new(0, 0, 0, desc == "" and 6 or (desc == "" and 24 or 36)),
+                ZIndex = 55,
+            })
+            inputContainer.Parent = row
+            Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = inputContainer })
+
+            -- Icon (optional)
+            local iconLabel
+            if icon then
+                iconLabel = Create("ImageLabel", {
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(0, 18, 0, 18),
+                    Position = UDim2.new(0, 8, 0.5, 0),
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Image = icon:match("^rbxassetid://") and icon or "",
+                    ImageColor3 = iconThemed and theme.Text or nil,
+                    ImageTransparency = iconThemed and 0 or 0.4,
+                    ZIndex = 56,
+                })
+                iconLabel.Parent = inputContainer
+            end
+
+            -- TextBox
+            local input = Create("TextBox", {
+                BackgroundTransparency = 1,
+                Text = text,
+                Font = Enum.Font.Gotham,
+                TextSize = 13,
+                TextColor3 = theme.Text,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
+                PlaceholderText = placeholder,
+                PlaceholderColor3 = theme.SubText,
+                ClearTextOnFocus = clearOnFocus,
+                MultiLine = multiline,
+                TextWrapped = multiline,
+                Size = UDim2.new(1, icon and -32 or -16, multiline and 1 or 1, 0),
+                Position = UDim2.new(0, icon and 32 or 8, 0, multiline and 4 or 0),
+                ZIndex = 56,
+            })
+            input.Parent = inputContainer
+
+            if multiline then
+                Create("UIPadding", {
+                    PaddingTop = UDim.new(0, 4),
+                    PaddingBottom = UDim.new(0, 4),
+                    Parent = input,
+                })
+            end
+
+            -- Focus effects
+            local originalSize = inputContainer.Size
+            input.Focused:Connect(function()
+                Ease(inputContainer, {
+                    Size = UDim2.new(1, 2, 0, multiline and 82 or 38),
+                    Position = UDim2.new(0, -1, 0, desc == "" and 5 or (desc == "" and 23 or 35))
+                }, 0.12)
+            end)
+
+            input.FocusLost:Connect(function()
+                Ease(inputContainer, {
+                    Size = originalSize,
+                    Position = UDim2.new(0, 0, 0, desc == "" and 6 or (desc == "" and 24 or 36))
+                }, 0.12)
+            end)
+
+            local function UpdateValue()
+                local newValue = isNumeric and tonumber(input.Text) or input.Text
+                if isNumeric and newValue == nil then
+                    -- Reset to old value on invalid input
+                    input.Text = text
+                    return
                 end
+                
+                text = tostring(newValue)
+                self.Window.Flags[flag] = newValue
+                self.Window.Config[flag] = newValue
+                SaveConfig(self.Window.ConfigName, self.Window.Config)
+                callback(newValue)
+            end
 
-                -- Click
-                menuItem.MouseButton1Click:Connect(function()
-                    if not item.Disabled then
-                        if item.Callback then
-                            item.Callback()
+            input.FocusLost:Connect(function(enterPressed)
+                UpdateValue()
+            end)
+
+            -- Live updates for multiline
+            if multiline then
+                input:GetPropertyChangedSignal("Text"):Connect(function()
+                    task.defer(function()
+                        if not input:IsFocused() then
+                            UpdateValue()
                         end
-                        menuGui.Visible = false
-                        menuOpen = false
-                    end
+                    end)
                 end)
             end
-        end
-    end
 
-    CreateMenu()
-
-    -- Right-click to open
-    target.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            menuOpen = not menuOpen
-            menuGui.Visible = menuOpen
-            
-            if menuOpen then
-                -- Position menu at cursor
-                local mouse = game.Players.LocalPlayer:GetMouse()
-                local targetPos = target.AbsolutePosition
-                local targetSize = target.AbsoluteSize
-                
-                menuGui.Position = UDim2.new(
-                    0, mouse.X - targetPos.X,
-                    0, mouse.Y - targetPos.Y
-                )
-                
-                -- Animate in
-                menuGui.Size = UDim2.new(0, 0, 0, 0)
-                Ease(menuGui, { Size = UDim2.new(0, 180, 0, menuGui.AbsoluteSize.Y) }, 0.15)
-            end
-        end
-    end)
-
-    -- Close when clicking outside
-    local closeConn
-    closeConn = UserInputService.InputBegan:Connect(function(input)
-        if menuOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mouse = game.Players.LocalPlayer:GetMouse()
-            local menuPos = menuGui.AbsolutePosition
-            local menuSize = menuGui.AbsoluteSize
-            
-            if mouse.X < menuPos.X or mouse.X > menuPos.X + menuSize.X or
-               mouse.Y < menuPos.Y or mouse.Y > menuPos.Y + menuSize.Y then
-                menuOpen = false
-                Ease(menuGui, { Size = UDim2.new(0, 0, 0, 0) }, 0.12)
-                task.wait(0.12)
-                menuGui.Visible = false
-            end
-        end
-    end)
-
-    local el = {
-        Gui = target,
-        ApplyTheme = function(newTheme)
-            theme = newTheme
-            CreateMenu() -- Recreate with new theme
-        end,
-        AddItem = function(name, icon, callback, disabled)
-            table.insert(items, {
-                Name = name,
-                Icon = icon,
-                Callback = callback,
-                Disabled = disabled or false
-            })
-            CreateMenu()
-        end,
-        RemoveItem = function(index)
-            if items[index] then
-                table.remove(items, index)
-                CreateMenu()
-            end
-        end,
-        Clear = function()
-            items = {}
-            CreateMenu()
-        end,
-        Destroy = function()
-            if menuGui then menuGui:Destroy() end
-            if closeConn then closeConn:Disconnect() end
-        end
-    }
-    
-    table.insert(self.Elements, el)
-    table.insert(section.Elements, el)
-    return el
-end
-        function section:AddColorPicker(opt)
-    opt = opt or {}
-    local name = opt.Name or "Color"
-    local desc = opt.Desc or ""
-    local default = opt.Default or Color3.fromRGB(255, 255, 255)
-    local flag = opt.Flag or ("TG_Col_" .. name)
-    local callback = opt.Callback or function() end
-    local showAlpha = opt.ShowAlpha or false
-
-    local theme = Themes[self.Window.ThemeName]
-    
-    if self.Window.Config[flag] == nil then
-        self.Window.Config[flag] = {default.R, default.G, default.B}
-    end
-    local colorData = self.Window.Config[flag]
-    local currentColor = Color3.new(colorData[1], colorData[2], colorData[3])
-    self.Window.Flags[flag] = currentColor
-
-    local row = Create("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, desc == "" and 36 or 48),
-        ZIndex = 54,
-    })
-    row.Parent = self.Content
-
-    -- Title
-    local titleLabel = Create("TextLabel", {
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamSemibold,
-        Text = name,
-        TextColor3 = theme.Text,
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Size = UDim2.new(1, -50, 0, desc == "" and 36 or 20),
-        Position = UDim2.new(0, 0, 0, desc == "" and 0 or 0),
-        ZIndex = 55,
-    })
-    titleLabel.Parent = row
-
-    -- Description
-    if desc ~= "" then
-        local descLabel = Create("TextLabel", {
-            BackgroundTransparency = 1,
-            Font = Enum.Font.Gotham,
-            Text = desc,
-            TextColor3 = theme.SubText,
-            TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Size = UDim2.new(1, -50, 0, 16),
-            Position = UDim2.new(0, 0, 0, 22),
-            ZIndex = 55,
-        })
-        descLabel.Parent = row
-    end
-
-    -- Color preview
-    local colorPreview = Create("TextButton", {
-        BackgroundColor3 = currentColor,
-        BackgroundTransparency = 0,
-        BorderSizePixel = 0,
-        Text = "",
-        Size = UDim2.new(0, 40, 0, 30),
-        Position = UDim2.new(1, -42, desc == "" and 0.5 or 0.25, 0),
-        AnchorPoint = Vector2.new(1, desc == "" and 0.5 or 0),
-        ZIndex = 55,
-        AutoButtonColor = false,
-    })
-    colorPreview.Parent = row
-    Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = colorPreview })
-    Create("UIStroke", {
-        Color = theme.StrokeSoft,
-        Thickness = 2,
-        Transparency = 0.3,
-        Parent = colorPreview,
-    })
-
-    -- Color picker dialog (created when clicked)
-    local pickerOpen = false
-    local pickerDialog
-
-    local function CreateColorPickerDialog()
-        if pickerDialog then pickerDialog:Destroy() end
-        
-        -- Overlay
-        local overlay = Create("Frame", {
-            BackgroundColor3 = Color3.new(0, 0, 0),
-            BackgroundTransparency = 0.7,
-            Size = UDim2.new(1, 0, 1, 0),
-            ZIndex = 998,
-        })
-        overlay.Parent = self.Window.Gui
-
-        -- Dialog
-        pickerDialog = Create("Frame", {
-            BackgroundColor3 = theme.CardBg,
-            BackgroundTransparency = CardAlpha(self.Window.Transparent) - 0.2,
-            Size = UDim2.new(0, 300, 0, showAlpha and 380 or 340),
-            Position = UDim2.new(0.5, -150, 0.5, showAlpha and -190 or -170),
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            ZIndex = 999,
-        })
-        pickerDialog.Parent = overlay
-        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = pickerDialog })
-        Create("UIStroke", {
-            Color = theme.StrokeSoft,
-            Thickness = 1,
-            Transparency = 0.2,
-            Parent = pickerDialog,
-        })
-
-        Create("UIPadding", {
-            PaddingTop = UDim.new(0, 12),
-            PaddingBottom = UDim.new(0, 12),
-            PaddingLeft = UDim.new(0, 12),
-            PaddingRight = UDim.new(0, 12),
-            Parent = pickerDialog,
-        })
-
-        -- Title
-        local dialogTitle = Create("TextLabel", {
-            BackgroundTransparency = 1,
-            Font = Enum.Font.GothamSemibold,
-            Text = name,
-            TextColor3 = theme.Text,
-            TextSize = 16,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Size = UDim2.new(1, 0, 0, 24),
-            ZIndex = 1000,
-        })
-        dialogTitle.Parent = pickerDialog
-
-        -- Color spectrum
-        local spectrum = Create("ImageLabel", {
-            Image = "rbxassetid://14204231522", -- Color spectrum image
-            Size = UDim2.new(1, 0, 0, 200),
-            Position = UDim2.new(0, 0, 0, 30),
-            BackgroundColor3 = Color3.new(1, 1, 1),
-            ZIndex = 1000,
-        })
-        spectrum.Parent = pickerDialog
-        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = spectrum })
-
-        -- Hue slider
-        local hueSlider = Create("Frame", {
-            BackgroundColor3 = Color3.new(1, 1, 1),
-            Size = UDim2.new(1, 0, 0, 20),
-            Position = UDim2.new(0, 0, 0, 240),
-            ZIndex = 1000,
-        })
-        hueSlider.Parent = pickerDialog
-        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = hueSlider })
-
-        -- Create hue gradient
-        local hueGradient = Create("UIGradient", {
-            Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
-                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
-                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+            local el = {
+                Gui = row,
+                ApplyTheme = function(newTheme)
+                    theme = newTheme
+                    if name ~= "" then
+                        local title = row:FindFirstChildWhichIsA("TextLabel")
+                        if title then title.TextColor3 = theme.Text end
+                    end
+                    if desc ~= "" then
+                        local descLabel = row:FindFirstChildWhichIsA("TextLabel", true)
+                        if descLabel then descLabel.TextColor3 = theme.SubText end
+                    end
+                    inputContainer.BackgroundColor3 = theme.ElementBg
+                    input.TextColor3 = theme.Text
+                    input.PlaceholderColor3 = theme.SubText
+                    if iconLabel and iconThemed then
+                        iconLabel.ImageColor3 = theme.Text
+                    end
+                end,
+                Set = function(newValue)
+                    local finalValue = isNumeric and tonumber(newValue) or tostring(newValue)
+                    if finalValue ~= nil then
+                        text = tostring(finalValue)
+                        input.Text = text
+                        self.Window.Flags[flag] = finalValue
+                        self.Window.Config[flag] = finalValue
+                        SaveConfig(self.Window.ConfigName, self.Window.Config)
+                        callback(finalValue)
+                    end
+                end,
+                Get = function() 
+                    local value = isNumeric and tonumber(input.Text) or input.Text
+                    return value or (isNumeric and 0 or "")
+                end,
+                SetPlaceholder = function(newPlaceholder)
+                    input.PlaceholderText = newPlaceholder
+                end,
             }
-        })
-        hueGradient.Parent = hueSlider
-
-        -- Alpha slider (optional)
-        local alphaSlider
-        if showAlpha then
-            alphaSlider = Create("Frame", {
-                BackgroundColor3 = Color3.new(1, 1, 1),
-                Size = UDim2.new(1, 0, 0, 20),
-                Position = UDim2.new(0, 0, 0, 270),
-                ZIndex = 1000,
-            })
-            alphaSlider.Parent = pickerDialog
-            Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = alphaSlider })
-        end
-
-        -- Buttons
-        local buttonRow = Create("Frame", {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 32),
-            Position = UDim2.new(0, 0, 1, -32),
-            ZIndex = 1000,
-        })
-        buttonRow.Parent = pickerDialog
-
-        local cancelBtn = Create("TextButton", {
-            BackgroundColor3 = theme.ElementBg,
-            BackgroundTransparency = 0.05,
-            Text = "Cancel",
-            Font = Enum.Font.Gotham,
-            TextSize = 13,
-            TextColor3 = theme.Text,
-            Size = UDim2.new(0.48, -4, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0),
-            ZIndex = 1001,
-        })
-        cancelBtn.Parent = buttonRow
-        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = cancelBtn })
-
-        local applyBtn = Create("TextButton", {
-            BackgroundColor3 = theme.Accent,
-            BackgroundTransparency = 0,
-            Text = "Apply",
-            Font = Enum.Font.GothamSemibold,
-            TextSize = 13,
-            TextColor3 = Color3.new(1, 1, 1),
-            Size = UDim2.new(0.48, -4, 1, 0),
-            Position = UDim2.new(0.52, 0, 0, 0),
-            ZIndex = 1001,
-        })
-        applyBtn.Parent = buttonRow
-        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = applyBtn })
-
-        -- Close function
-        local function ClosePicker()
-            pickerOpen = false
-            Ease(pickerDialog, { Size = UDim2.new(0, 0, 0, 0) }, 0.15)
-            Ease(overlay, { BackgroundTransparency = 1 }, 0.15)
-            task.wait(0.15)
-            overlay:Destroy()
-        end
-
-        cancelBtn.MouseButton1Click:Connect(ClosePicker)
-        applyBtn.MouseButton1Click:Connect(function()
-            -- Save color
-            self.Window.Config[flag] = {currentColor.R, currentColor.G, currentColor.B}
-            SaveConfig(self.Window.ConfigName, self.Window.Config)
-            callback(currentColor)
-            ClosePicker()
-        end)
-
-        overlay.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                ClosePicker()
-            end
-        end)
-
-        -- Animate in
-        pickerDialog.Size = UDim2.new(0, 0, 0, 0)
-        Ease(pickerDialog, { Size = UDim2.new(0, 300, 0, showAlpha and 380 or 340) }, 0.2)
-    end
-
-    colorPreview.MouseButton1Click:Connect(function()
-        if not pickerOpen then
-            pickerOpen = true
-            CreateColorPickerDialog()
-        end
-    end)
-
-    local el = {
-        Gui = row,
-        ApplyTheme = function(newTheme)
-            theme = newTheme
-            titleLabel.TextColor3 = theme.Text
-            if desc ~= "" then
-                local descLabel = row:FindFirstChildWhichIsA("TextLabel", true)
-                if descLabel then descLabel.TextColor3 = theme.SubText end
-            end
-            local stroke = colorPreview:FindFirstChildOfClass("UIStroke")
-            if stroke then stroke.Color = theme.StrokeSoft end
-        end,
-        SetColor = function(newColor)
-            currentColor = newColor
-            colorPreview.BackgroundColor3 = currentColor
-            self.Window.Flags[flag] = currentColor
-            self.Window.Config[flag] = {currentColor.R, currentColor.G, currentColor.B}
-            SaveConfig(self.Window.ConfigName, self.Window.Config)
-            callback(currentColor)
-        end,
-        GetColor = function() return currentColor end,
-    }
-    
-    table.insert(self.Elements, el)
-    table.insert(section.Elements, el)
-    return el
-end
-        -- Example usage
-local function ExampleWindow()
-    local window = TakoGlass:CreateWindow({
-        Title = "Enhanced TakoGlass",
-        SubTitle = "All WindUI Features Added",
-        Size = UDim2.fromOffset(600, 500),
-        Theme = "Dark",
-        Transparent = true,
-        UseBlur = true,
-    })
-    
-    local tab = window:CreateTab("Main")
-    local section = tab:CreateSection({Name = "Enhanced Elements"})
-    
-    -- Enhanced button with icon
-    section:AddButton({
-        Name = "Primary Button",
-        Desc = "With icon and description",
-        Icon = "rbxassetid://132464694294269", -- Example icon ID
-        Color = "Accent",
-        Callback = function()
-            TakoGlass.Notify("Button Clicked", "Primary button was clicked!", 3)
-        end
-    })
-    
-    -- Enhanced input
-    section:AddInput({
-        Name = "Username",
-        Desc = "Enter your username",
-        Placeholder = "player123",
-        Icon = "rbxassetid://132464694294269",
-        Callback = function(value)
-            print("Username:", value)
-        end
-    })
-    
-    -- Code block
-    section:AddCodeBlock({
-        Title = "Example Code",
-        Code = [[
-            local function helloWorld()
-                print("Hello from TakoGlass!")
-                return true
-            end
             
-            -- This is a comment
-            local result = helloWorld()
-        ]],
-        Language = "lua",
-        Copyable = true,
-        Callback = function(code)
-            print("Code copied to clipboard")
+            table.insert(self.Elements, el)
+            table.insert(section.Elements, el)
+            LinkElement(el)
+            return el
         end
-    })
-    
-    -- Color picker
-    section:AddColorPicker({
-        Name = "Primary Color",
-        Desc = "Choose your primary color",
-        Default = Color3.fromRGB(90, 135, 255),
-        ShowAlpha = true,
-        Callback = function(color)
-            print("Color selected:", color)
-        end
-    })
-end
+        
+        section.AddCodeBlock = function(self, opt)
+            opt = opt or {}
+            local title = opt.Title or "Code"
+            local code = opt.Code or ""
+            local language = opt.Language or "lua" -- 'lua', 'python', 'js', etc.
+            local copyable = opt.Copyable ~= false
+            local callback = opt.Callback or function() end
 
+            local theme = Themes[self.Window.ThemeName]
+            
+            -- Syntax highlighting colors
+            local syntaxColors = {
+                keyword = Color3.fromRGB(255, 119, 168),    -- pink
+                string = Color3.fromRGB(152, 195, 121),     -- green
+                number = Color3.fromRGB(255, 184, 108),     -- orange
+                comment = Color3.fromRGB(150, 152, 150),    -- gray
+                functionName = Color3.fromRGB(97, 175, 239), -- blue
+                operator = Color3.fromRGB(198, 120, 221),   -- purple
+            }
+
+            local function highlightLua(codeText)
+                -- Simple Lua syntax highlighter
+                local patterns = {
+                    {pattern = "%-%-%[%[.*%]%]", color = syntaxColors.comment},  -- multi-line comment
+                    {pattern = "%-%-[^\n]*", color = syntaxColors.comment},      -- single line comment
+                    {pattern = "\".-[^\\]\"", color = syntaxColors.string},      -- double quotes
+                    {pattern = "\'.-[^\\]\'", color = syntaxColors.string},      -- single quotes
+                    {pattern = "\\b(%d+%.?%d*)\\b", color = syntaxColors.number}, -- numbers
+                    {pattern = "\\b(function|local|if|then|else|elseif|end|for|while|repeat|until|return|break|do|in|and|or|not)\\b", color = syntaxColors.keyword},
+                    {pattern = "\\b([%w_]+)%s*%(", color = syntaxColors.functionName}, -- function calls
+                    {pattern = "[%+%-%*/%%%^#=<>~]", color = syntaxColors.operator}, -- operators
+                }
+                
+                local result = codeText
+                for _, pat in ipairs(patterns) do
+                    result = string.gsub(result, pat.pattern, function(match)
+                        return string.format('<font color="#%s">%s</font>', pat.color:ToHex(), match)
+                    end)
+                end
+                return result
+            end
+
+            local row = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                ZIndex = 54,
+            })
+            row.Parent = self.Content
+
+            -- Title bar
+            local titleBar = Create("Frame", {
+                BackgroundColor3 = theme.CardBg,
+                BackgroundTransparency = CardAlpha(self.Window.Transparent) + 0.1,
+                Size = UDim2.new(1, 0, 0, 28),
+                ZIndex = 55,
+            })
+            titleBar.Parent = row
+            Create("UICorner", {
+                CornerRadius = UDim.new(0, RADIUS),
+                Parent = titleBar
+            })
+
+            local titleLabel = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamSemibold,
+                Text = title,
+                TextColor3 = theme.Text,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Size = UDim2.new(1, copyable and -30 or -10, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
+                ZIndex = 56,
+            })
+            titleLabel.Parent = titleBar
+
+            -- Language badge
+            local langBadge = Create("TextLabel", {
+                BackgroundColor3 = theme.Accent,
+                BackgroundTransparency = 0.2,
+                Text = string.upper(language),
+                Font = Enum.Font.Gotham,
+                TextSize = 10,
+                TextColor3 = Color3.new(1, 1, 1),
+                Size = UDim2.new(0, 40, 0, 16),
+                Position = UDim2.new(1, -50, 0.5, 0),
+                AnchorPoint = Vector2.new(1, 0.5),
+                TextXAlignment = Enum.TextXAlignment.Center,
+                ZIndex = 57,
+            })
+            langBadge.Parent = titleBar
+            Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = langBadge })
+
+            -- Copy button
+            local copyButton
+            if copyable then
+                copyButton = Create("TextButton", {
+                    BackgroundTransparency = 1,
+                    Text = "📋",
+                    Font = Enum.Font.Gotham,
+                    TextSize = 14,
+                    TextColor3 = theme.SubText,
+                    Size = UDim2.new(0, 24, 0, 24),
+                    Position = UDim2.new(1, -32, 0.5, 0),
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    ZIndex = 57,
+                })
+                copyButton.Parent = titleBar
+
+                copyButton.MouseEnter:Connect(function()
+                    Ease(copyButton, { TextColor3 = theme.Text }, 0.1)
+                end)
+                copyButton.MouseLeave:Connect(function()
+                    Ease(copyButton, { TextColor3 = theme.SubText }, 0.1)
+                end)
+
+                copyButton.MouseButton1Click:Connect(function()
+                    -- Copy to clipboard
+                    if writeclipboard then
+                        writeclipboard(code)
+                    elseif setclipboard then
+                        setclipboard(code)
+                    end
+                    
+                    -- Visual feedback
+                    local originalText = copyButton.Text
+                    copyButton.Text = "✓"
+                    copyButton.TextColor3 = Color3.fromRGB(76, 175, 80)
+                    
+                    callback(code)
+                    
+                    task.wait(1)
+                    copyButton.Text = originalText
+                    copyButton.TextColor3 = theme.SubText
+                end)
+            end
+
+            -- Code container
+            local codeContainer = Create("Frame", {
+                BackgroundColor3 = theme.CardBg,
+                BackgroundTransparency = CardAlpha(self.Window.Transparent),
+                Size = UDim2.new(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                Position = UDim2.new(0, 0, 0, 32),
+                ZIndex = 55,
+            })
+            codeContainer.Parent = row
+            Create("UICorner", {
+                CornerRadius = UDim.new(0, RADIUS),
+                Parent = codeContainer
+            })
+            Create("UIStroke", {
+                Color = theme.StrokeSoft,
+                Thickness = 1,
+                Transparency = 0.4,
+                Parent = codeContainer,
+            })
+
+            Create("UIPadding", {
+                PaddingTop = UDim.new(0, 8),
+                PaddingBottom = UDim.new(0, 8),
+                PaddingLeft = UDim.new(0, 12),
+                PaddingRight = UDim.new(0, 12),
+                Parent = codeContainer,
+            })
+
+            -- Code text with syntax highlighting
+            local codeText = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Code,
+                Text = highlightLua(code),
+                RichText = true,
+                TextColor3 = theme.Text,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextYAlignment = Enum.TextYAlignment.Top,
+                TextWrapped = true,
+                Size = UDim2.new(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                ZIndex = 56,
+            })
+            codeText.Parent = codeContainer
+
+            -- Update row height when text changes
+            codeText:GetPropertyChangedSignal("TextBounds"):Connect(function()
+                local height = math.max(40, codeText.TextBounds.Y + 16)
+                codeContainer.Size = UDim2.new(1, 0, 0, height)
+                row.Size = UDim2.new(1, 0, 0, height + 32)
+            end)
+
+            local el = {
+                Gui = row,
+                ApplyTheme = function(newTheme)
+                    theme = newTheme
+                    titleBar.BackgroundColor3 = theme.CardBg
+                    titleLabel.TextColor3 = theme.Text
+                    langBadge.BackgroundColor3 = theme.Accent
+                    codeContainer.BackgroundColor3 = theme.CardBg
+                    local stroke = codeContainer:FindFirstChildOfClass("UIStroke")
+                    if stroke then
+                        stroke.Color = theme.StrokeSoft
+                    end
+                    codeText.TextColor3 = theme.Text
+                    if copyButton then
+                        copyButton.TextColor3 = theme.SubText
+                    end
+                    -- Re-highlight with new theme
+                    codeText.Text = highlightLua(code)
+                end,
+                SetCode = function(newCode, newLanguage)
+                    code = newCode or code
+                    if newLanguage then
+                        language = newLanguage
+                        langBadge.Text = string.upper(language)
+                    end
+                    codeText.Text = highlightLua(code)
+                end,
+                GetCode = function() return code end,
+            }
+            
+            table.insert(self.Elements, el)
+            table.insert(section.Elements, el)
+            LinkElement(el)
+            return el
+        end
+        
+        section.AddRightClickMenu = function(self, opt)
+            opt = opt or {}
+            local target = opt.Target -- GUI element to attach menu to
+            local items = opt.Items or {} -- Table of {Name, Icon, Callback, Divider, Disabled}
+            local position = opt.Position or UDim2.new(0.5, 0, 0.5, 0)
+
+            if not target then
+                warn("AddRightClickMenu: No target specified")
+                return nil
+            end
+
+            local theme = Themes[self.Window.ThemeName]
+            local menuOpen = false
+            local menuGui
+
+            local function CreateMenu()
+                if menuGui then menuGui:Destroy() end
+                
+                menuGui = Create("Frame", {
+                    Name = "RightClickMenu",
+                    BackgroundColor3 = theme.CardBg,
+                    BackgroundTransparency = CardAlpha(self.Window.Transparent) - 0.1,
+                    BorderSizePixel = 0,
+                    Size = UDim2.new(0, 180, 0, 0),
+                    AutomaticSize = Enum.AutomaticSize.Y,
+                    Position = position,
+                    ZIndex = 999,
+                    Visible = false,
+                })
+                menuGui.Parent = target
+                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = menuGui })
+                Create("UIStroke", {
+                    Color = theme.StrokeSoft,
+                    Thickness = 1,
+                    Transparency = 0.2,
+                    Parent = menuGui,
+                })
+
+                local layout = Create("UIListLayout", {
+                    FillDirection = Enum.FillDirection.Vertical,
+                    Padding = UDim.new(0, 2),
+                })
+                layout.Parent = menuGui
+
+                Create("UIPadding", {
+                    PaddingTop = UDim.new(0, 4),
+                    PaddingBottom = UDim.new(0, 4),
+                    PaddingLeft = UDim.new(0, 4),
+                    PaddingRight = UDim.new(0, 4),
+                    Parent = menuGui,
+                })
+
+                -- Add menu items
+                for _, item in ipairs(items) do
+                    if item.Divider then
+                        -- Divider
+                        local divider = Create("Frame", {
+                            BackgroundColor3 = theme.StrokeSoft,
+                            BackgroundTransparency = 0.6,
+                            BorderSizePixel = 0,
+                            Size = UDim2.new(1, 0, 0, 1),
+                            ZIndex = 1000,
+                        })
+                        divider.Parent = menuGui
+                    else
+                        -- Menu item
+                        local menuItem = Create("TextButton", {
+                            BackgroundColor3 = Color3.new(1, 1, 1),
+                            BackgroundTransparency = 1,
+                            BorderSizePixel = 0,
+                            Text = "",
+                            Size = UDim2.new(1, 0, 0, 30),
+                            ZIndex = 1000,
+                            AutoButtonColor = false,
+                            Active = not item.Disabled,
+                        })
+                        menuItem.Parent = menuGui
+                        Create("UICorner", { CornerRadius = UDim.new(0, RADIUS - 2), Parent = menuItem })
+
+                        -- Icon
+                        if item.Icon then
+                            local icon = Create("ImageLabel", {
+                                BackgroundTransparency = 1,
+                                Size = UDim2.new(0, 18, 0, 18),
+                                Position = UDim2.new(0, 8, 0.5, 0),
+                                AnchorPoint = Vector2.new(0, 0.5),
+                                Image = item.Icon:match("^rbxassetid://") and item.Icon or "",
+                                ImageColor3 = item.Disabled and theme.SubText or theme.Text,
+                                ImageTransparency = item.Disabled and 0.6 or 0,
+                                ZIndex = 1001,
+                            })
+                            icon.Parent = menuItem
+                        end
+
+                        -- Text
+                        local textLabel = Create("TextLabel", {
+                            BackgroundTransparency = 1,
+                            Font = Enum.Font.Gotham,
+                            Text = item.Name,
+                            TextColor3 = item.Disabled and theme.SubText or theme.Text,
+                            TextTransparency = item.Disabled and 0.6 or 0,
+                            TextSize = 13,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            Size = UDim2.new(1, item.Icon and -30 or -10, 1, 0),
+                            Position = UDim2.new(0, item.Icon and 30 or 10, 0, 0),
+                            ZIndex = 1001,
+                        })
+                        textLabel.Parent = menuItem
+
+                        -- Hover effect
+                        if not item.Disabled then
+                            menuItem.MouseEnter:Connect(function()
+                                Ease(menuItem, { BackgroundTransparency = 0.9 }, 0.1)
+                            end)
+                            menuItem.MouseLeave:Connect(function()
+                                Ease(menuItem, { BackgroundTransparency = 1 }, 0.1)
+                            end)
+                        end
+
+                        -- Click
+                        menuItem.MouseButton1Click:Connect(function()
+                            if not item.Disabled then
+                                if item.Callback then
+                                    item.Callback()
+                                end
+                                menuGui.Visible = false
+                                menuOpen = false
+                            end
+                        end)
+                    end
+                end
+            end
+
+            CreateMenu()
+
+            -- Right-click to open
+            target.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    menuOpen = not menuOpen
+                    menuGui.Visible = menuOpen
+                    
+                    if menuOpen then
+                        -- Position menu at cursor
+                        local mouse = game.Players.LocalPlayer:GetMouse()
+                        local targetPos = target.AbsolutePosition
+                        local targetSize = target.AbsoluteSize
+                        
+                        menuGui.Position = UDim2.new(
+                            0, mouse.X - targetPos.X,
+                            0, mouse.Y - targetPos.Y
+                        )
+                        
+                        -- Animate in
+                        menuGui.Size = UDim2.new(0, 0, 0, 0)
+                        Ease(menuGui, { Size = UDim2.new(0, 180, 0, menuGui.AbsoluteSize.Y) }, 0.15)
+                    end
+                end
+            end)
+
+            -- Close when clicking outside
+            local closeConn
+            closeConn = UserInputService.InputBegan:Connect(function(input)
+                if menuOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    local mouse = game.Players.LocalPlayer:GetMouse()
+                    local menuPos = menuGui.AbsolutePosition
+                    local menuSize = menuGui.AbsoluteSize
+                    
+                    if mouse.X < menuPos.X or mouse.X > menuPos.X + menuSize.X or
+                       mouse.Y < menuPos.Y or mouse.Y > menuPos.Y + menuSize.Y then
+                        menuOpen = false
+                        Ease(menuGui, { Size = UDim2.new(0, 0, 0, 0) }, 0.12)
+                        task.wait(0.12)
+                        menuGui.Visible = false
+                    end
+                end
+            end)
+
+            local el = {
+                Gui = target,
+                ApplyTheme = function(newTheme)
+                    theme = newTheme
+                    CreateMenu() -- Recreate with new theme
+                end,
+                AddItem = function(name, icon, callback, disabled)
+                    table.insert(items, {
+                        Name = name,
+                        Icon = icon,
+                        Callback = callback,
+                        Disabled = disabled or false
+                    })
+                    CreateMenu()
+                end,
+                RemoveItem = function(index)
+                    if items[index] then
+                        table.remove(items, index)
+                        CreateMenu()
+                    end
+                end,
+                Clear = function()
+                    items = {}
+                    CreateMenu()
+                end,
+                Destroy = function()
+                    if menuGui then menuGui:Destroy() end
+                    if closeConn then closeConn:Disconnect() end
+                end
+            }
+            
+            table.insert(self.Elements, el)
+            table.insert(section.Elements, el)
+            LinkElement(el)
+            return el
+        end
+        
+        section.AddColorPicker = function(self, opt)
+            opt = opt or {}
+            local name = opt.Name or "Color"
+            local desc = opt.Desc or ""
+            local default = opt.Default or Color3.fromRGB(255, 255, 255)
+            local flag = opt.Flag or ("TG_Col_" .. name)
+            local callback = opt.Callback or function() end
+            local showAlpha = opt.ShowAlpha or false
+
+            local theme = Themes[self.Window.ThemeName]
+            
+            if self.Window.Config[flag] == nil then
+                self.Window.Config[flag] = {default.R, default.G, default.B}
+            end
+            local colorData = self.Window.Config[flag]
+            local currentColor = Color3.new(colorData[1], colorData[2], colorData[3])
+            self.Window.Flags[flag] = currentColor
+
+            local row = Create("Frame", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, desc == "" and 36 or 48),
+                ZIndex = 54,
+            })
+            row.Parent = self.Content
+
+            -- Title
+            local titleLabel = Create("TextLabel", {
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamSemibold,
+                Text = name,
+                TextColor3 = theme.Text,
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Size = UDim2.new(1, -50, 0, desc == "" and 36 or 20),
+                Position = UDim2.new(0, 0, 0, desc == "" and 0 or 0),
+                ZIndex = 55,
+            })
+            titleLabel.Parent = row
+
+            -- Description
+            if desc ~= "" then
+                local descLabel = Create("TextLabel", {
+                    BackgroundTransparency = 1,
+                    Font = Enum.Font.Gotham,
+                    Text = desc,
+                    TextColor3 = theme.SubText,
+                    TextSize = 12,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Size = UDim2.new(1, -50, 0, 16),
+                    Position = UDim2.new(0, 0, 0, 22),
+                    ZIndex = 55,
+                })
+                descLabel.Parent = row
+            end
+
+            -- Color preview
+            local colorPreview = Create("TextButton", {
+                BackgroundColor3 = currentColor,
+                BackgroundTransparency = 0,
+                BorderSizePixel = 0,
+                Text = "",
+                Size = UDim2.new(0, 40, 0, 30),
+                Position = UDim2.new(1, -42, desc == "" and 0.5 or 0.25, 0),
+                AnchorPoint = Vector2.new(1, desc == "" and 0.5 or 0),
+                ZIndex = 55,
+                AutoButtonColor = false,
+            })
+            colorPreview.Parent = row
+            Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = colorPreview })
+            Create("UIStroke", {
+                Color = theme.StrokeSoft,
+                Thickness = 2,
+                Transparency = 0.3,
+                Parent = colorPreview,
+            })
+
+            -- Color picker dialog (created when clicked)
+            local pickerOpen = false
+            local pickerDialog
+
+            local function CreateColorPickerDialog()
+                if pickerDialog then pickerDialog:Destroy() end
+                
+                -- Overlay
+                local overlay = Create("Frame", {
+                    BackgroundColor3 = Color3.new(0, 0, 0),
+                    BackgroundTransparency = 0.7,
+                    Size = UDim2.new(1, 0, 1, 0),
+                    ZIndex = 998,
+                })
+                overlay.Parent = self.Window.Gui
+
+                -- Dialog
+                pickerDialog = Create("Frame", {
+                    BackgroundColor3 = theme.CardBg,
+                    BackgroundTransparency = CardAlpha(self.Window.Transparent) - 0.2,
+                    Size = UDim2.new(0, 300, 0, showAlpha and 380 or 340),
+                    Position = UDim2.new(0.5, -150, 0.5, showAlpha and -190 or -170),
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    ZIndex = 999,
+                })
+                pickerDialog.Parent = overlay
+                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = pickerDialog })
+                Create("UIStroke", {
+                    Color = theme.StrokeSoft,
+                    Thickness = 1,
+                    Transparency = 0.2,
+                    Parent = pickerDialog,
+                })
+
+                Create("UIPadding", {
+                    PaddingTop = UDim.new(0, 12),
+                    PaddingBottom = UDim.new(0, 12),
+                    PaddingLeft = UDim.new(0, 12),
+                    PaddingRight = UDim.new(0, 12),
+                    Parent = pickerDialog,
+                })
+
+                -- Title
+                local dialogTitle = Create("TextLabel", {
+                    BackgroundTransparency = 1,
+                    Font = Enum.Font.GothamSemibold,
+                    Text = name,
+                    TextColor3 = theme.Text,
+                    TextSize = 16,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Size = UDim2.new(1, 0, 0, 24),
+                    ZIndex = 1000,
+                })
+                dialogTitle.Parent = pickerDialog
+
+                -- Color spectrum
+                local spectrum = Create("ImageLabel", {
+                    Image = "rbxassetid://14204231522", -- Color spectrum image
+                    Size = UDim2.new(1, 0, 0, 200),
+                    Position = UDim2.new(0, 0, 0, 30),
+                    BackgroundColor3 = Color3.new(1, 1, 1),
+                    ZIndex = 1000,
+                })
+                spectrum.Parent = pickerDialog
+                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = spectrum })
+
+                -- Hue slider
+                local hueSlider = Create("Frame", {
+                    BackgroundColor3 = Color3.new(1, 1, 1),
+                    Size = UDim2.new(1, 0, 0, 20),
+                    Position = UDim2.new(0, 0, 0, 240),
+                    ZIndex = 1000,
+                })
+                hueSlider.Parent = pickerDialog
+                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = hueSlider })
+
+                -- Create hue gradient
+                local hueGradient = Create("UIGradient", {
+                    Color = ColorSequence.new{
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+                    }
+                })
+                hueGradient.Parent = hueSlider
+
+                -- Alpha slider (optional)
+                local alphaSlider
+                if showAlpha then
+                    alphaSlider = Create("Frame", {
+                        BackgroundColor3 = Color3.new(1, 1, 1),
+                        Size = UDim2.new(1, 0, 0, 20),
+                        Position = UDim2.new(0, 0, 0, 270),
+                        ZIndex = 1000,
+                    })
+                    alphaSlider.Parent = pickerDialog
+                    Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = alphaSlider })
+                end
+
+                -- Buttons
+                local buttonRow = Create("Frame", {
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(1, 0, 0, 32),
+                    Position = UDim2.new(0, 0, 1, -32),
+                    ZIndex = 1000,
+                })
+                buttonRow.Parent = pickerDialog
+
+                local cancelBtn = Create("TextButton", {
+                    BackgroundColor3 = theme.ElementBg,
+                    BackgroundTransparency = 0.05,
+                    Text = "Cancel",
+                    Font = Enum.Font.Gotham,
+                    TextSize = 13,
+                    TextColor3 = theme.Text,
+                    Size = UDim2.new(0.48, -4, 1, 0),
+                    Position = UDim2.new(0, 0, 0, 0),
+                    ZIndex = 1001,
+                })
+                cancelBtn.Parent = buttonRow
+                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = cancelBtn })
+
+                local applyBtn = Create("TextButton", {
+                    BackgroundColor3 = theme.Accent,
+                    BackgroundTransparency = 0,
+                    Text = "Apply",
+                    Font = Enum.Font.GothamSemibold,
+                    TextSize = 13,
+                    TextColor3 = Color3.new(1, 1, 1),
+                    Size = UDim2.new(0.48, -4, 1, 0),
+                    Position = UDim2.new(0.52, 0, 0, 0),
+                    ZIndex = 1001,
+                })
+                applyBtn.Parent = buttonRow
+                Create("UICorner", { CornerRadius = UDim.new(0, RADIUS), Parent = applyBtn })
+
+                -- Close function
+                local function ClosePicker()
+                    pickerOpen = false
+                    Ease(pickerDialog, { Size = UDim2.new(0, 0, 0, 0) }, 0.15)
+                    Ease(overlay, { BackgroundTransparency = 1 }, 0.15)
+                    task.wait(0.15)
+                    overlay:Destroy()
+                end
+
+                cancelBtn.MouseButton1Click:Connect(ClosePicker)
+                applyBtn.MouseButton1Click:Connect(function()
+                    -- Save color
+                    self.Window.Config[flag] = {currentColor.R, currentColor.G, currentColor.B}
+                    SaveConfig(self.Window.ConfigName, self.Window.Config)
+                    callback(currentColor)
+                    ClosePicker()
+                end)
+
+                overlay.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        ClosePicker()
+                    end
+                end)
+
+                -- Animate in
+                pickerDialog.Size = UDim2.new(0, 0, 0, 0)
+                Ease(pickerDialog, { Size = UDim2.new(0, 300, 0, showAlpha and 380 or 340) }, 0.2)
+            end
+
+            colorPreview.MouseButton1Click:Connect(function()
+                if not pickerOpen then
+                    pickerOpen = true
+                    CreateColorPickerDialog()
+                end
+            end)
+
+            local el = {
+                Gui = row,
+                ApplyTheme = function(newTheme)
+                    theme = newTheme
+                    titleLabel.TextColor3 = theme.Text
+                    if desc ~= "" then
+                        local descLabel = row:FindFirstChildWhichIsA("TextLabel", true)
+                        if descLabel then descLabel.TextColor3 = theme.SubText end
+                    end
+                    local stroke = colorPreview:FindFirstChildOfClass("UIStroke")
+                    if stroke then stroke.Color = theme.StrokeSoft end
+                end,
+                SetColor = function(newColor)
+                    currentColor = newColor
+                    colorPreview.BackgroundColor3 = currentColor
+                    self.Window.Flags[flag] = currentColor
+                    self.Window.Config[flag] = {currentColor.R, currentColor.G, currentColor.B}
+                    SaveConfig(self.Window.ConfigName, self.Window.Config)
+                    callback(currentColor)
+                end,
+                GetColor = function() return currentColor end,
+            }
+            
+            table.insert(self.Elements, el)
+            table.insert(section.Elements, el)
+            LinkElement(el)
+            return el
+        end
         
         table.insert(tab.Sections, section)
         return section
