@@ -558,7 +558,6 @@ function TakoGlass:CreateWindow(opts)
         Name = "TakoGlass_Root",
         ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        ZIndex = 100,
     })
     gui.Parent = playerGui
     self.Gui = gui
