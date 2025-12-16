@@ -59,11 +59,10 @@ local CONFIG_FOLDER  = "TakoGlassConfigs"
 local DEFAULT_THEME  = "Dark"
 local MAX_NOTIF      = 5
 local RADIUS         = 8
-local ICON_FONT      = textLabel.Font = Enum.Font.Gotham -- For icons
+local ICON_FONT      = Enum.Font.Gotham  -- For icons
 local DEFAULT_FONT   = Enum.Font.Gotham
 local ELEMENT_HEIGHT = 22
 local ELEMENT_SPACING= 6
-
 local _windowInstance  = nil -- Only one window allowed
 local _currentThemeName= DEFAULT_THEME
 local _takoGuiRoot     = nil -- ScreenGui for the main window
