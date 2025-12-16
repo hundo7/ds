@@ -243,7 +243,6 @@ local Tooltip = (function()
             Name = "TakoGlass_Tooltip",
             ResetOnSpawn = false,
             ZIndexBehavior = Enum.ZIndexBehavior.Global,
-            ZIndex = 300,
             Enabled = false,
         })
         gui.Parent = pg
