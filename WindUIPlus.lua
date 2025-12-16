@@ -1,377 +1,600 @@
--- WindUIPlus Executor Edition
--- Single-file UI Library (Rayfield/Linoria-inspired)
--- Executor-only (HttpGet, writefile/readfile supported)
--- No prints. Notifications only.
+--[[
 
--- =========================================================
--- SERVICES / EXECUTOR API SAFETY
--- =========================================================
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
+	Rayfield Interface Suite
+	by Sirius
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+	shlex  | Designing + Programming
+	iRay   | Programming
+	Max    | Programming
+	Damian | Programming
 
-local writefile = writefile or function() end
-local readfile = readfile or function() return nil end
-local isfile = isfile or function() return false end
-local makefolder = makefolder or function() end
+]]
 
--- =========================================================
--- LIBRARY ROOT
--- =========================================================
-local Library = {}
-Library.__index = Library
-Library.Version = "1.0.0"
-Library.Flags = {}
-Library.Windows = {}
-Library.Themes = {}
-Library.Localization = {}
-Library.CurrentLanguage = "en"
-Library.ConfigFolder = "WindUIPlus"
-Library.LastConfigFile = "last.json"
+if debugX then
+	warn('Initialising Rayfield')
+end
 
--- =========================================================
--- DEFAULT LOCALIZATION
--- =========================================================
-Library.Localization.en = {
-    Loaded = "Loaded",
-    Saved = "Saved",
-    Error = "Error",
-    Config = "Config",
-    Theme = "Theme",
-    About = "About",
+local function getService(name)
+	local service = game:GetService(name)
+	return if cloneref then cloneref(service) else service
+end
+
+-- Loads and executes a function hosted on a remote URL. Cancels the request if the requested URL takes too long to respond.
+-- Errors with the function are caught and logged to the output
+local function loadWithTimeout(url: string, timeout: number?): ...any
+	assert(type(url) == "string", "Expected string, got " .. type(url))
+	timeout = timeout or 5
+	local requestCompleted = false
+	local success, result = false, nil
+
+	local requestThread = task.spawn(function()
+		local fetchSuccess, fetchResult = pcall(game.HttpGet, game, url) -- game:HttpGet(url)
+		-- If the request fails the content can be empty, even if fetchSuccess is true
+		if not fetchSuccess or #fetchResult == 0 then
+			if #fetchResult == 0 then
+				fetchResult = "Empty response" -- Set the error message
+			end
+			success, result = false, fetchResult
+			requestCompleted = true
+			return
+		end
+		local content = fetchResult -- Fetched content
+		local execSuccess, execResult = pcall(function()
+			return loadstring(content)()
+		end)
+		success, result = execSuccess, execResult
+		requestCompleted = true
+	end)
+
+	local timeoutThread = task.delay(timeout, function()
+		if not requestCompleted then
+			warn(`Request for {url} timed out after {timeout} seconds`)
+			task.cancel(requestThread)
+			result = "Request timed out"
+			requestCompleted = true
+		end
+	end)
+
+	-- Wait for completion or timeout
+	while not requestCompleted do
+		task.wait()
+	end
+	-- Cancel timeout thread if still running when request completes
+	if coroutine.status(timeoutThread) ~= "dead" then
+		task.cancel(timeoutThread)
+	end
+	if not success then
+		warn(`Failed to process {url}: {result}`)
+	end
+	return if success then result else nil
+end
+
+local requestsDisabled = true --getgenv and getgenv().DISABLE_RAYFIELD_REQUESTS
+local InterfaceBuild = '3K3W'
+local Release = "Build 1.68"
+local RayfieldFolder = "Rayfield"
+local ConfigurationFolder = RayfieldFolder.."/Configurations"
+local ConfigurationExtension = ".rfld"
+local settingsTable = {
+	General = {
+		-- if needs be in order just make getSetting(name)
+		rayfieldOpen = {Type = 'bind', Value = 'K', Name = 'Rayfield Keybind'},
+		-- buildwarnings
+		-- rayfieldprompts
+
+	},
+	System = {
+		usageAnalytics = {Type = 'toggle', Value = true, Name = 'Anonymised Analytics'},
+	}
 }
 
--- =========================================================
--- THEMES
--- =========================================================
-Library.Themes.Dark = {
-    Background = Color3.fromRGB(18,18,18),
-    Panel = Color3.fromRGB(24,24,24),
-    Accent = Color3.fromRGB(88,101,242),
-    Text = Color3.fromRGB(235,235,235),
-    Muted = Color3.fromRGB(140,140,140)
+-- Settings that have been overridden by the developer. These will not be saved to the user's configuration file
+-- Overridden settings always take precedence over settings in the configuration file, and are cleared if the user changes the setting in the UI
+local overriddenSettings: { [string]: any } = {} -- For example, overriddenSettings["System.rayfieldOpen"] = "J"
+local function overrideSetting(category: string, name: string, value: any)
+	overriddenSettings[`{category}.{name}`] = value
+end
+
+local function getSetting(category: string, name: string): any
+	if overriddenSettings[`{category}.{name}`] ~= nil then
+		return overriddenSettings[`{category}.{name}`]
+	elseif settingsTable[category][name] ~= nil then
+		return settingsTable[category][name].Value
+	end
+end
+
+-- If requests/analytics have been disabled by developer, set the user-facing setting to false as well
+if requestsDisabled then
+	overrideSetting("System", "usageAnalytics", false)
+end
+
+local HttpService = getService('HttpService')
+local RunService = getService('RunService')
+
+-- Environment Check
+local useStudio = RunService:IsStudio() or false
+
+local settingsCreated = false
+local settingsInitialized = false -- Whether the UI elements in the settings page have been set to the proper values
+local cachedSettings
+local prompt = useStudio and require(script.Parent.prompt) or loadWithTimeout('https://raw.githubusercontent.com/SiriusSoftwareLtd/Sirius/refs/heads/request/prompt.lua')
+local requestFunc = (syn and syn.request) or (fluxus and fluxus.request) or (http and http.request) or http_request or request
+
+-- Validate prompt loaded correctly
+if not prompt and not useStudio then
+	warn("Failed to load prompt library, using fallback")
+	prompt = {
+		create = function() end -- No-op fallback
+	}
+end
+
+
+
+local function loadSettings()
+	local file = nil
+
+	local success, result =	pcall(function()
+		task.spawn(function()
+			if isfolder and isfolder(RayfieldFolder) then
+				if isfile and isfile(RayfieldFolder..'/settings'..ConfigurationExtension) then
+					file = readfile(RayfieldFolder..'/settings'..ConfigurationExtension)
+				end
+			end
+
+			-- for debug in studio
+			if useStudio then
+				file = [[
+		{"General":{"rayfieldOpen":{"Value":"K","Type":"bind","Name":"Rayfield Keybind","Element":{"HoldToInteract":false,"Ext":true,"Name":"Rayfield Keybind","Set":null,"CallOnChange":true,"Callback":null,"CurrentKeybind":"K"}}},"System":{"usageAnalytics":{"Value":false,"Type":"toggle","Name":"Anonymised Analytics","Element":{"Ext":true,"Name":"Anonymised Analytics","Set":null,"CurrentValue":false,"Callback":null}}}}}
+	]]
+			end
+
+
+			if file then
+				local success, decodedFile = pcall(function() return HttpService:JSONDecode(file) end)
+				if success then
+					file = decodedFile
+				else
+					file = {}
+				end
+			else
+				file = {}
+			end
+
+
+			if not settingsCreated then 
+				cachedSettings = file
+				return
+			end
+
+			if file ~= {} then
+				for categoryName, settingCategory in pairs(settingsTable) do
+					if file[categoryName] then
+						for settingName, setting in pairs(settingCategory) do
+							if file[categoryName][settingName] then
+								setting.Value = file[categoryName][settingName].Value
+								setting.Element:Set(getSetting(categoryName, settingName))
+							end
+						end
+					end
+				end
+			end
+			settingsInitialized = true
+		end)
+	end)
+
+	if not success then 
+		if writefile then
+			warn('Rayfield had an issue accessing configuration saving capability.')
+		end
+	end
+end
+
+if debugX then
+	warn('Now Loading Settings Configuration')
+end
+
+loadSettings()
+
+if debugX then
+	warn('Settings Loaded')
+end
+
+local analyticsLib
+local sendReport = function(ev_n, sc_n) warn("Failed to load report function") end
+if not requestsDisabled then
+	if debugX then
+		warn('Querying Settings for Reporter Information')
+	end	
+	analyticsLib = loadWithTimeout("https://analytics.sirius.menu/script")
+	if not analyticsLib then
+		warn("Failed to load analytics reporter")
+		analyticsLib = nil
+	elseif analyticsLib and type(analyticsLib.load) == "function" then
+		analyticsLib:load()
+	else
+		warn("Analytics library loaded but missing load function")
+		analyticsLib = nil
+	end
+	sendReport = function(ev_n, sc_n)
+		if not (type(analyticsLib) == "table" and type(analyticsLib.isLoaded) == "function" and analyticsLib:isLoaded()) then
+			warn("Analytics library not loaded")
+			return
+		end
+		if useStudio then
+			print('Sending Analytics')
+		else
+			if debugX then warn('Reporting Analytics') end
+			analyticsLib:report(
+				{
+					["name"] = ev_n,
+					["script"] = {["name"] = sc_n, ["version"] = Release}
+				},
+				{
+					["version"] = InterfaceBuild
+				}
+			)
+			if debugX then warn('Finished Report') end
+		end
+	end
+	if cachedSettings and (#cachedSettings == 0 or (cachedSettings.System and cachedSettings.System.usageAnalytics and cachedSettings.System.usageAnalytics.Value)) then
+		sendReport("execution", "Rayfield")
+	elseif not cachedSettings then
+		sendReport("execution", "Rayfield")
+	end
+end
+
+local promptUser = 2
+
+if promptUser == 1 and prompt and type(prompt.create) == "function" then
+	prompt.create(
+		'Be cautious when running scripts',
+	    [[Please be careful when running scripts from unknown developers. This script has already been ran.
+
+<font transparency='0.3'>Some scripts may steal your items or in-game goods.</font>]],
+		'Okay',
+		'',
+		function()
+
+		end
+	)
+end
+
+if debugX then
+	warn('Moving on to continue initialisation')
+end
+
+local RayfieldLibrary = {
+	Flags = {},
+	Theme = {
+		Default = {
+			TextColor = Color3.fromRGB(240, 240, 240),
+
+			Background = Color3.fromRGB(25, 25, 25),
+			Topbar = Color3.fromRGB(34, 34, 34),
+			Shadow = Color3.fromRGB(20, 20, 20),
+
+			NotificationBackground = Color3.fromRGB(20, 20, 20),
+			NotificationActionsBackground = Color3.fromRGB(230, 230, 230),
+
+			TabBackground = Color3.fromRGB(80, 80, 80),
+			TabStroke = Color3.fromRGB(85, 85, 85),
+			TabBackgroundSelected = Color3.fromRGB(210, 210, 210),
+			TabTextColor = Color3.fromRGB(240, 240, 240),
+			SelectedTabTextColor = Color3.fromRGB(50, 50, 50),
+
+			ElementBackground = Color3.fromRGB(35, 35, 35),
+			ElementBackgroundHover = Color3.fromRGB(40, 40, 40),
+			SecondaryElementBackground = Color3.fromRGB(25, 25, 25),
+			ElementStroke = Color3.fromRGB(50, 50, 50),
+			SecondaryElementStroke = Color3.fromRGB(40, 40, 40),
+
+			SliderBackground = Color3.fromRGB(50, 138, 220),
+			SliderProgress = Color3.fromRGB(50, 138, 220),
+			SliderStroke = Color3.fromRGB(58, 163, 255),
+
+			ToggleBackground = Color3.fromRGB(30, 30, 30),
+			ToggleEnabled = Color3.fromRGB(0, 146, 214),
+			ToggleDisabled = Color3.fromRGB(100, 100, 100),
+			ToggleEnabledStroke = Color3.fromRGB(0, 170, 255),
+			ToggleDisabledStroke = Color3.fromRGB(125, 125, 125),
+			ToggleEnabledOuterStroke = Color3.fromRGB(100, 100, 100),
+			ToggleDisabledOuterStroke = Color3.fromRGB(65, 65, 65),
+
+			DropdownSelected = Color3.fromRGB(40, 40, 40),
+			DropdownUnselected = Color3.fromRGB(30, 30, 30),
+
+			InputBackground = Color3.fromRGB(30, 30, 30),
+			InputStroke = Color3.fromRGB(65, 65, 65),
+			PlaceholderColor = Color3.fromRGB(178, 178, 178)
+		},
+
+		Ocean = {
+			TextColor = Color3.fromRGB(230, 240, 240),
+
+			Background = Color3.fromRGB(20, 30, 30),
+			Topbar = Color3.fromRGB(25, 40, 40),
+			Shadow = Color3.fromRGB(15, 20, 20),
+
+			NotificationBackground = Color3.fromRGB(25, 35, 35),
+			NotificationActionsBackground = Color3.fromRGB(230, 240, 240),
+
+			TabBackground = Color3.fromRGB(40, 60, 60),
+			TabStroke = Color3.fromRGB(50, 70, 70),
+			TabBackgroundSelected = Color3.fromRGB(100, 180, 180),
+			TabTextColor = Color3.fromRGB(210, 230, 230),
+			SelectedTabTextColor = Color3.fromRGB(20, 50, 50),
+
+			ElementBackground = Color3.fromRGB(30, 50, 50),
+			ElementBackgroundHover = Color3.fromRGB(40, 60, 60),
+			SecondaryElementBackground = Color3.fromRGB(30, 45, 45),
+			ElementStroke = Color3.fromRGB(45, 70, 70),
+			SecondaryElementStroke = Color3.fromRGB(40, 65, 65),
+
+			SliderBackground = Color3.fromRGB(0, 110, 110),
+			SliderProgress = Color3.fromRGB(0, 140, 140),
+			SliderStroke = Color3.fromRGB(0, 160, 160),
+
+			ToggleBackground = Color3.fromRGB(30, 50, 50),
+			ToggleEnabled = Color3.fromRGB(0, 130, 130),
+			ToggleDisabled = Color3.fromRGB(70, 90, 90),
+			ToggleEnabledStroke = Color3.fromRGB(0, 160, 160),
+			ToggleDisabledStroke = Color3.fromRGB(90, 110, 110),
+			ToggleEnabledOuterStroke = Color3.fromRGB(80, 100, 100),
+			ToggleDisabledOuterStroke = Color3.fromRGB(50, 70, 70),
+
+			DropdownSelected = Color3.fromRGB(35, 55, 55),
+			DropdownUnselected = Color3.fromRGB(25, 45, 45),
+
+			InputBackground = Color3.fromRGB(25, 40, 40),
+			InputStroke = Color3.fromRGB(50, 70, 70),
+			PlaceholderColor = Color3.fromRGB(170, 190, 190)
+		},
+
+		Light = {
+			TextColor = Color3.fromRGB(50, 50, 50),
+
+			Background = Color3.fromRGB(255, 255, 255),
+			Topbar = Color3.fromRGB(217, 217, 217),
+			Shadow = Color3.fromRGB(223, 223, 223),
+
+			NotificationBackground = Color3.fromRGB(220, 220, 220),
+			NotificationActionsBackground = Color3.fromRGB(217, 217, 217),
+
+			TabBackground = Color3.fromRGB(230, 230, 230),
+			TabStroke = Color3.fromRGB(223, 223, 223),
+			TabBackgroundSelected = Color3.fromRGB(215, 215, 215),
+			TabTextColor = Color3.fromRGB(50, 50, 50),
+			SelectedTabTextColor = Color3.fromRGB(50, 50, 50),
+
+			ElementBackground = Color3.fromRGB(240, 240, 240),
+			ElementBackgroundHover = Color3.fromRGB(235, 235, 235),
+			SecondaryElementBackground = Color3.fromRGB(210, 210, 210),
+			ElementStroke = Color3.fromRGB(180, 199, 97),
+			SecondaryElementStroke = Color3.fromRGB(180, 199, 97),
+
+			SliderBackground = Color3.fromRGB(180, 199, 97),
+			SliderProgress = Color3.fromRGB(180, 199, 97),
+			SliderStroke = Color3.fromRGB(180, 199, 97),
+
+			ToggleBackground = Color3.fromRGB(255, 255, 255),
+			ToggleEnabled = Color3.fromRGB(180, 199, 97),
+			ToggleDisabled = Color3.fromRGB(255, 255, 255),
+			ToggleEnabledStroke = Color3.fromRGB(180, 199, 97),
+			ToggleDisabledStroke = Color3.fromRGB(180, 199, 97),
+			ToggleEnabledOuterStroke = Color3.fromRGB(180, 199, 97),
+			ToggleDisabledOuterStroke = Color3.fromRGB(180, 199, 97),
+
+			DropdownSelected = Color3.fromRGB(230, 230, 230),
+			DropdownUnselected = Color3.fromRGB(220, 220, 220),
+
+			InputBackground = Color3.fromRGB(240, 240, 240),
+			InputStroke = Color3.fromRGB(180, 199, 97),
+			PlaceholderColor = Color3.fromRGB(100, 100, 100)
+		}
+	},
+	EnableSaving = true,
+	EnableKeySystem = false,
+	Discord = {
+		IsEnabled = false,
+		Link = nil,
+		RememberJoins = true -- Set this to false to make them join the discord every time they load it up
+	},
+	IconData = {
+		id = 6035047374, -- "rbxassetid://6035047374",
+		imageRectOffset = Vector2.new(964, 324),
+		imageRectSize = Vector2.new(36, 36),
+	}
 }
 
-Library.Themes.Light = {
-    Background = Color3.fromRGB(245,245,245),
-    Panel = Color3.fromRGB(255,255,255),
-    Accent = Color3.fromRGB(0,120,255),
-    Text = Color3.fromRGB(20,20,20),
-    Muted = Color3.fromRGB(120,120,120)
-}
-
-Library.CurrentTheme = Library.Themes.Dark
-
--- =========================================================
--- UTILITIES
--- =========================================================
-local Util = {}
-
-function Util:Tween(obj, info, props)
-    local t = TweenService:Create(obj, info, props)
-    t:Play()
-    return t
+-- Icons
+local Icons = loadWithTimeout('https://raw.githubusercontent.com/SiriusSoftwareLtd/Sirius/refs/heads/request/icons.lua')
+local getAssetUri = function(asset)
+	if typeof(asset) == 'number' then
+		return 'rbxassetid://'..asset
+	elseif typeof(asset) == 'string' then
+		return asset
+	end
 end
 
-function Util:Create(class, props)
-    local inst = Instance.new(class)
-    for k,v in pairs(props or {}) do inst[k] = v end
-    return inst
+local getIcon = function(name)
+	if typeof(Icons) == "table" and Icons[name] then
+		return Icons[name]
+	else
+		warn(`Icon '{name}' not found`)
+		return {id = 0}
+	end
 end
 
-function Util:Round(n, inc)
-    inc = inc or 1
-    return math.floor(n / inc + 0.5) * inc
+-- New Version Notification
+task.spawn(function()
+	local success, result = pcall(function()
+		local latestVersion = loadWithTimeout('https://analytics.sirius.menu/rayfield/latest')
+		if latestVersion and latestVersion ~= Release then
+			RayfieldLibrary:Notify({
+				Title = "Rayfield Interface Suite",
+				Content = "A new version of Rayfield is available. Please download it from the Sirius website.",
+				Duration = 7,
+				Image = 4483362458,
+				Actions = { -- Notification Buttons
+					Open = {
+						Name = "Open Download Page",
+						Callback = function()
+							requestFunc({
+								Url = 'http://127.0.0.1:6463/rpc?v=1',
+								Method = 'POST',
+								Headers = {
+									['Content-Type'] = 'application/json',
+									Origin = 'https://discord.com'
+								},
+								Body = HttpService:JSONEncode({
+									cmd = 'INVITE_BROWSER',
+									nonce = HttpService:GenerateGUID(false),
+									args = {code = "sirius"}
+								})
+							})
+							RayfieldLibrary:Notify({Title = "Rayfield Interface Suite", Content = "The download page has been opened. You can now update to the latest version.", Duration = 7, Image = 4483362458, })
+						end
+					},
+
+					Ignore = {
+						Name = "Ignore",
+						Callback = function()
+							RayfieldLibrary:Notify({Title = "Rayfield Interface Suite", Content = "You have ignored the notification.", Duration = 7, Image = 4483362458, })
+						end
+					},
+				},
+			})
+		end
+	end)
+end)
+
+local UserInputService = getService("UserInputService")
+local TweenService = getService("TweenService")
+local HttpService = getService("HttpService")
+local TextService = getService("TextService")
+local Mouse = game.Players.LocalPlayer:GetMouse()
+local Players = getService("Players")
+local RS = getService("RunService")
+local CoreGui = getService("CoreGui")
+local ContentProvider = getService("ContentProvider")
+local TP = getService("TeleportService")
+local InsertService = getService("InsertService")
+local Lighting = getService("Lighting")
+
+local function DeepCopyTable(t)
+	local copy = {}
+	for k, v in pairs(t) do
+		if type(v) == "table" then
+			copy[k] = DeepCopyTable(v)
+		else
+			copy[k] = v
+		end
+	end
+	return copy
 end
 
-function Util:Safe(cb, ...)
-    local ok, err = pcall(cb, ...)
-    if not ok then
-        Library:Notify(Library.Localization[Library.CurrentLanguage].Error, tostring(err))
-    end
-end
+local function CreateWindow(Settings)
+	sendReport("window", Settings.Name)
+	local Passthrough = false
+	if not Settings.LoadingTitle then
+		Settings.LoadingTitle = "Rayfield Interface Suite"
+	end
+	if not Settings.LoadingSubtitle then
+		Settings.LoadingSubtitle = "by Sirius"
+	end
+	if Settings.SaveConfiguration == nil then
+		Settings.SaveConfiguration = true
+	end
+	if Settings.ConfigurationSaving then
+		if Settings.ConfigurationSaving.Enabled and Settings.ConfigurationSaving.FolderName then
+			RayfieldFolder = Settings.ConfigurationSaving.FolderName
+			ConfigurationFolder = Settings.ConfigurationSaving.FolderName.."/Configurations"
+			Settings.ConfigurationSaving.Enabled = true
+		else
+			Settings.ConfigurationSaving.Enabled = false
+		end
+	end
+	local Rayfield = game:GetObjects("rbxassetid://11702779409")[1]
 
--- =========================================================
--- BLUR / ACRYLIC
--- =========================================================
-local Blur = Instance.new("BlurEffect")
-Blur.Size = 0
-Blur.Parent = Lighting
+	if gethui then
+		Rayfield.Parent = gethui()
+	elseif syn.protect_gui then 
+		syn.protect_gui(Rayfield)
+		Rayfield.Parent = CoreGui
+	else
+		Rayfield.Parent = CoreGui
+	end
 
-function Library:SetBlur(state)
-    Util:Tween(Blur, TweenInfo.new(0.25), {Size = state and 18 or 0})
-end
+	if gethui then
+		for _, Interface in ipairs(gethui():GetChildren()) do
+			if Interface.Name == Rayfield.Name and Interface ~= Rayfield then
+				Interface.Enabled = false
+				Interface.Name = "Rayfield-Old"
+			end
+		end
+	else
+		for _, Interface in ipairs(CoreGui:GetChildren()) do
+			if Interface.Name == Rayfield.Name and Interface ~= Rayfield then
+				Interface.Enabled = false
+				Interface.Name = "Rayfield-Old"
+			end
+		end
+	end
 
--- =========================================================
--- NOTIFICATIONS
--- =========================================================
-local NotifyGui = Util:Create("ScreenGui", {Name = "WindUIPlus_Notify", ResetOnSpawn = false, Parent = PlayerGui})
+	-- Theme Saving
+	local themeFile
+	if Settings.ConfigurationSaving then
+		if not isfolder(RayfieldFolder) then
+			makefolder(tostring(RayfieldFolder))
+		end
+		if not isfolder(RayfieldFolder.."/Themes") then
+			makefolder(tostring(RayfieldFolder).."/Themes")
+		end
+		if not isfile(tostring(RayfieldFolder).."/Themes".."/".."Default.txt") then
+			themeFile = HttpService:JSONEncode(RayfieldLibrary.Theme.Default)
+			writefile(tostring(RayfieldFolder).."/Themes".."/".."Default.txt", themeFile)
+		end
+	end
 
-local NotifyHolder = Util:Create("Frame", {
-    Parent = NotifyGui,
-    AnchorPoint = Vector2.new(1,1),
-    Position = UDim2.fromScale(0.98,0.98),
-    Size = UDim2.fromScale(0.3,0.5),
-    BackgroundTransparency = 1
-})
+	-- Icon
+	local asset = getIcon("rayfield")
+	Rayfield.Main.WindowIcon.Image = 'rbxassetid://'..asset.id
+	Rayfield.Main.WindowIcon.ImageRectOffset = asset.imageRectOffset
+	Rayfield.Main.WindowIcon.ImageRectSize = asset.imageRectSize
 
-local NotifyLayout = Util:Create("UIListLayout", {Parent = NotifyHolder, Padding = UDim.new(0,8), HorizontalAlignment = Enum.HorizontalAlignment.Right, VerticalAlignment = Enum.VerticalAlignment.Bottom})
+	local SelectedTheme = RayfieldLibrary.Theme.Default
+	local function LoadTheme(Theme)
+		local themeFile = readfile(tostring(RayfieldFolder).."/Themes".."/"..Theme..".txt")
+		local themeTable = HttpService:JSONDecode(themeFile)
+		SelectedTheme = themeTable
+		for _, obj in ipairs(Rayfield:GetDescendants()) do
+			pcall(function()
+				if obj.ClassName == "TextButton" or obj.ClassName == "TextLabel" or obj.ClassName == "TextBox" or obj.ClassName == "ImageButton" or obj.ClassName == "ImageLabel" then
+					if SelectedTheme[obj.Name] then
+						obj.BackgroundColor3 = SelectedTheme[obj.Name]
+					elseif SelectedTheme[obj.Parent.Name] then
+						obj.BackgroundColor3 = SelectedTheme[obj.Parent.Name]
+					elseif SelectedTheme[obj.Parent.Parent.Name] then
+						obj.BackgroundColor3 = SelectedTheme[obj.Parent.Parent.Name]
+					end
+				end
+			end)
+		end
+	end
 
-function Library:Notify(title, text, duration)
-    duration = duration or 3
-    local theme = Library.CurrentTheme
+	local function SaveTheme(Theme)
+		if not isfile(tostring(RayfieldFolder).."/Themes".."/"..Theme..".txt") then
+			local themeTable = {}
+			for _, obj in ipairs(Rayfield:GetDescendants()) do
+				pcall(function()
+					if obj.ClassName == "TextButton" or obj.ClassName == "TextLabel" or obj.ClassName == "TextBox" or obj.ClassName == "ImageButton" or obj.ClassName == "ImageLabel" then
+						themeTable[obj.Name] = obj.BackgroundColor3
+					end
+				end)
+			end
+			local themeFile = HttpService:JSONEncode(themeTable)
+			writefile(tostring(RayfieldFolder).."/Themes".."/"..Theme..".txt", themeFile)
+		end
+	end
 
-    local card = Util:Create("Frame", {
-        Parent = NotifyHolder,
-        Size = UDim2.new(1,0,0,64),
-        BackgroundColor3 = theme.Panel,
-        BorderSizePixel = 0
-    })
-    Util:Create("UICorner", {CornerRadius = UDim.new(0,10), Parent = card})
-
-    local t = Util:Create("TextLabel", {
-        Parent = card,
-        Position = UDim2.fromOffset(12,8),
-        Size = UDim2.new(1,-24,0,20),
-        BackgroundTransparency = 1,
-        Text = tostring(title),
-        Font = Enum.Font.GothamBold,
-        TextSize = 14,
-        TextXAlignment = Left,
-        TextColor3 = theme.Text
-    })
-
-    local d = Util:Create("TextLabel", {
-        Parent = card,
-        Position = UDim2.fromOffset(12,30),
-        Size = UDim2.new(1,-24,0,24),
-        BackgroundTransparency = 1,
-        TextWrapped = true,
-        Text = tostring(text),
-        Font = Enum.Font.Gotham,
-        TextSize = 13,
-        TextXAlignment = Left,
-        TextColor3 = theme.Muted
-    })
-
-    card.BackgroundTransparency = 1
-    Util:Tween(card, TweenInfo.new(0.25), {BackgroundTransparency = 0})
-
-    task.delay(duration, function()
-        Util:Tween(card, TweenInfo.new(0.25), {BackgroundTransparency = 1})
-        task.wait(0.3)
-        card:Destroy()
-    end)
-end
-
--- =========================================================
--- CONFIG SYSTEM
--- =========================================================
-function Library:EnsureFolder()
-    if not isfolder or not isfolder(Library.ConfigFolder) then
-        makefolder(Library.ConfigFolder)
-    end
-end
-
-function Library:SaveConfig(name)
-    self:EnsureFolder()
-    local path = Library.ConfigFolder .. "/" .. name .. ".json"
-    writefile(path, HttpService:JSONEncode(Library.Flags))
-    writefile(Library.ConfigFolder .. "/" .. Library.LastConfigFile, name)
-    self:Notify(Library.Localization[self.CurrentLanguage].Saved, name)
-end
-
-function Library:LoadConfig(name)
-    local path = Library.ConfigFolder .. "/" .. name .. ".json"
-    if isfile(path) then
-        local data = HttpService:JSONDecode(readfile(path))
-        for k,v in pairs(data) do
-            if Library.Flags[k] ~= nil then
-                Library.Flags[k] = v
-            end
-        end
-        self:Notify(Library.Localization[self.CurrentLanguage].Loaded, name)
-    end
-end
-
-function Library:AutoLoad()
-    local last = Library.ConfigFolder .. "/" .. Library.LastConfigFile
-    if isfile(last) then
-        local name = readfile(last)
-        self:LoadConfig(name)
-    end
-end
-
--- =========================================================
--- DRAGGING
--- =========================================================
-function Util:MakeDraggable(handle, frame)
-    local dragging, start, startPos
-    handle.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            start = i.Position
-            startPos = frame.Position
-            i.Changed:Connect(function()
-                if i.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = i.Position - start
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-end
-
--- =========================================================
--- WINDOW
--- =========================================================
-function Library:CreateWindow(opts)
-    opts = opts or {}
-    local theme = self.CurrentTheme
-
-    local gui = Util:Create("ScreenGui", {Name = "WindUIPlus", ResetOnSpawn = false, Parent = PlayerGui})
-
-    local main = Util:Create("Frame", {
-        Parent = gui,
-        Position = UDim2.fromScale(0.5,0.5),
-        AnchorPoint = Vector2.new(0.5,0.5),
-        Size = UDim2.fromOffset(640,420),
-        BackgroundColor3 = theme.Background,
-        BorderSizePixel = 0
-    })
-    Util:Create("UICorner", {CornerRadius = UDim.new(0,12), Parent = main})
-
-    local top = Util:Create("Frame", {Parent = main, Size = UDim2.new(1,0,0,44), BackgroundColor3 = theme.Panel, BorderSizePixel = 0})
-    Util:Create("UICorner", {CornerRadius = UDim.new(0,12), Parent = top})
-
-    local title = Util:Create("TextLabel", {Parent = top, Position = UDim2.fromOffset(12,0), Size = UDim2.new(1,-24,1,0), BackgroundTransparency = 1, Text = opts.Title or "WindUIPlus", Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Left, TextColor3 = theme.Text})
-
-    Util:MakeDraggable(top, main)
-
-    local tabsBar = Util:Create("Frame", {Parent = main, Position = UDim2.fromOffset(0,44), Size = UDim2.new(0,160,1,-44), BackgroundColor3 = theme.Panel, BorderSizePixel = 0})
-    local content = Util:Create("Frame", {Parent = main, Position = UDim2.fromOffset(160,44), Size = UDim2.new(1,-160,1,-44), BackgroundTransparency = 1})
-
-    local tabLayout = Util:Create("UIListLayout", {Parent = tabsBar, Padding = UDim.new(0,6)})
-
-    local Window = {Tabs = {}, Gui = gui, Main = main, Content = content}
-
-    function Window:CreateTab(name)
-        local btn = Util:Create("TextButton", {Parent = tabsBar, Size = UDim2.new(1,-12,0,36), Text = name, Font = Enum.Font.Gotham, TextSize = 14, BackgroundColor3 = theme.Background, TextColor3 = theme.Text, BorderSizePixel = 0})
-        Util:Create("UICorner", {CornerRadius = UDim.new(0,8), Parent = btn})
-
-        local page = Util:Create("ScrollingFrame", {Parent = content, Size = UDim2.new(1,0,1,0), CanvasSize = UDim2.new(0,0,0,0), ScrollBarImageTransparency = 1, Visible = false})
-        local layout = Util:Create("UIListLayout", {Parent = page, Padding = UDim.new(0,12)})
-
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            page.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 12)
-        end)
-
-        local Tab = {}
-
-        function Tab:Show()
-            for _,t in pairs(Window.Tabs) do t.Page.Visible = false end
-            page.Visible = true
-        end
-
-        btn.MouseButton1Click:Connect(function() Tab:Show() end)
-
-        function Tab:CreateSection(text)
-            local holder = Util:Create("Frame", {Parent = page, Size = UDim2.new(1,-24,0,0), BackgroundColor3 = theme.Panel, BorderSizePixel = 0})
-            Util:Create("UICorner", {CornerRadius = UDim.new(0,10), Parent = holder})
-
-            local title = Util:Create("TextLabel", {Parent = holder, Position = UDim2.fromOffset(12,8), Size = UDim2.new(1,-24,0,20), BackgroundTransparency = 1, Text = text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Left, TextColor3 = theme.Text})
-
-            local list = Util:Create("UIListLayout", {Parent = holder, Padding = UDim.new(0,8)})
-            list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                holder.Size = UDim2.new(1,-24,0,list.AbsoluteContentSize.Y + 20)
-            end)
-
-            local Section = {}
-
-            function Section:AddToggle(name, default, cb)
-                Library.Flags[name] = default
-                local b = Util:Create("TextButton", {Parent = holder, Size = UDim2.new(1,-24,0,32), Text = name, BackgroundColor3 = theme.Background, TextColor3 = theme.Text, Font = Enum.Font.Gotham, TextSize = 13, BorderSizePixel = 0})
-                Util:Create("UICorner", {CornerRadius = UDim.new(0,8), Parent = b})
-                b.MouseButton1Click:Connect(function()
-                    Library.Flags[name] = not Library.Flags[name]
-                    Util:Safe(cb, Library.Flags[name])
-                end)
-            end
-
-            function Section:AddSlider(name, min, max, def, cb)
-                Library.Flags[name] = def
-                local f = Util:Create("Frame", {Parent = holder, Size = UDim2.new(1,-24,0,40), BackgroundTransparency = 1})
-                local bar = Util:Create("Frame", {Parent = f, Position = UDim2.fromOffset(0,24), Size = UDim2.new(1,0,0,6), BackgroundColor3 = theme.Background, BorderSizePixel = 0})
-                local fill = Util:Create("Frame", {Parent = bar, Size = UDim2.fromScale((def-min)/(max-min),1), BackgroundColor3 = theme.Accent, BorderSizePixel = 0})
-                Util:Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = bar})
-                Util:Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = fill})
-                local dragging=false
-                bar.InputBegan:Connect(function(i)
-                    if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end
-                end)
-                UserInputService.InputEnded:Connect(function(i)
-                    if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
-                end)
-                UserInputService.InputChanged:Connect(function(i)
-                    if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
-                        local x=(i.Position.X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X
-                        x=math.clamp(x,0,1)
-                        fill.Size=UDim2.fromScale(x,1)
-                        local v=Util:Round(min+(max-min)*x,1)
-                        Library.Flags[name]=v
-                        Util:Safe(cb,v)
-                    end
-                end)
-            end
-
-            function Section:AddDropdown(name, list, cb)
-                Library.Flags[name] = list[1]
-                local b = Util:Create("TextButton", {Parent = holder, Size = UDim2.new(1,-24,0,32), Text = name, BackgroundColor3 = theme.Background, TextColor3 = theme.Text, Font = Enum.Font.Gotham, TextSize = 13, BorderSizePixel = 0})
-                Util:Create("UICorner", {CornerRadius = UDim.new(0,8), Parent = b})
-                b.MouseButton1Click:Connect(function()
-                    local idx = table.find(list, Library.Flags[name]) or 1
-                    idx = idx % #list + 1
-                    Library.Flags[name] = list[idx]
-                    Util:Safe(cb, Library.Flags[name])
-                end)
-            end
-
-            function Section:AddInput(name, cb)
-                Library.Flags[name] = ""
-                local box = Util:Create("TextBox", {Parent = holder, Size = UDim2.new(1,-24,0,32), PlaceholderText = name, Text = "", BackgroundColor3 = theme.Background, TextColor3 = theme.Text, Font = Enum.Font.Gotham, TextSize = 13, BorderSizePixel = 0})
-                Util:Create("UICorner", {CornerRadius = UDim.new(0,8), Parent = box})
-                box.FocusLost:Connect(function()
-                    Library.Flags[name] = box.Text
-                    Util:Safe(cb, box.Text)
-                end)
-            end
-
-            return Section
-        end
-
-        Tab.Page = page
-        table.insert(Window.Tabs, Tab)
-        if #Window.Tabs == 1 then Tab:Show() end
-        return Tab
-    end
-
-    Library:SetBlur(true)
-    table.insert(Library.Windows, Window)
-    return Window
-end
-
--- =========================================================
--- INIT
--- =========================================================
-Library:AutoLoad()
-
-return setmetatable(Library, Library)
+	function RayfieldLibrary:Notify(NotificationSettings
