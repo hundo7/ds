@@ -1986,8 +1986,8 @@ end
             TextColor3 = theme.Text,
             TextSize = 14,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Size = UDim2.new(1, 0, 0, desc == "" and 0 : 16),
-            Position = UDim2.new(0, 0, 0, desc == "" ? -18 : 0),
+            Size = UDim2.new(1, 0, 0, desc == "" and 0 or 16),
+            Position = UDim2.new(0, 0, 0, desc == "" and -18 or 0),
             ZIndex = 55,
         })
         title.Parent = row
@@ -2014,8 +2014,8 @@ end
         BackgroundColor3 = theme.ElementBg,
         BackgroundTransparency = 0.05,
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, multiline and 80 : 36),
-        Position = UDim2.new(0, 0, 0, desc == "" ? 6 : (desc == "" ? 24 : 36)),
+        Size = UDim2.new(1, 0, 0, multiline and 80 or 36),
+        Position = UDim2.new(0, 0, 0, desc == "" and 6 or (desc == "" and 24 or 36)),
         ZIndex = 55,
     })
     inputContainer.Parent = row
@@ -2051,8 +2051,8 @@ end
         ClearTextOnFocus = clearOnFocus,
         MultiLine = multiline,
         TextWrapped = multiline,
-        Size = UDim2.new(1, icon and -32 or -16, multiline and 1 : 1, 0),
-        Position = UDim2.new(0, icon and 32 : 8, 0, multiline ? 4 : 0),
+        Size = UDim2.new(1, icon and -32 or -16, multiline and 1 or 1, 0),
+        Position = UDim2.new(0, icon and 32 or 8, 0, multiline and 4 or 0),
         ZIndex = 56,
     })
     input.Parent = inputContainer
@@ -2069,15 +2069,15 @@ end
     local originalSize = inputContainer.Size
     input.Focused:Connect(function()
         Ease(inputContainer, {
-            Size = UDim2.new(1, 2, 0, multiline and 82 : 38),
-            Position = UDim2.new(0, -1, 0, desc == "" ? 5 : (desc == "" ? 23 : 35))
+            Size = UDim2.new(1, 2, 0, multiline and 82 or 38),
+            Position = UDim2.new(0, -1, 0, desc == "" and 5 or (desc == "" and 23 or 35))
         }, 0.12)
     end)
 
     input.FocusLost:Connect(function()
         Ease(inputContainer, {
             Size = originalSize,
-            Position = UDim2.new(0, 0, 0, desc == "" ? 6 : (desc == "" ? 24 : 36))
+            Position = UDim2.new(0, 0, 0, desc == "" and 6 or (desc == "" and 24 or 36))
         }, 0.12)
     end)
 
@@ -2478,11 +2478,11 @@ end
                     Font = Enum.Font.Gotham,
                     Text = item.Name,
                     TextColor3 = item.Disabled and theme.SubText or theme.Text,
-                    TextTransparency = item.Disabled and 0.6 : 0,
+                    TextTransparency = item.Disabled and 0.6 or 0,
                     TextSize = 13,
                     TextXAlignment = Enum.TextXAlignment.Left,
-                    Size = UDim2.new(1, item.Icon and -30 : -10, 1, 0),
-                    Position = UDim2.new(0, item.Icon and 30 : 10, 0, 0),
+                    Size = UDim2.new(1, item.Icon and -30 or -10, 1, 0),
+                    Position = UDim2.new(0, item.Icon and 30 or 10, 0, 0),
                     ZIndex = 1001,
                 })
                 textLabel.Parent = menuItem
@@ -2623,8 +2623,8 @@ end
         TextColor3 = theme.Text,
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
-        Size = UDim2.new(1, -50, 0, desc == "" and 36 : 20),
-        Position = UDim2.new(0, 0, 0, desc == "" ? 0 : 0),
+        Size = UDim2.new(1, -50, 0, desc == "" and 36 or 20),
+        Position = UDim2.new(0, 0, 0, desc == "" and 0 or 0),
         ZIndex = 55,
     })
     titleLabel.Parent = row
@@ -2652,8 +2652,8 @@ end
         BorderSizePixel = 0,
         Text = "",
         Size = UDim2.new(0, 40, 0, 30),
-        Position = UDim2.new(1, -42, desc == "" ? 0.5 : 0.25, 0),
-        AnchorPoint = Vector2.new(1, desc == "" ? 0.5 : 0),
+        Position = UDim2.new(1, -42, desc == "" and 0.5 or 0.25, 0),
+        AnchorPoint = Vector2.new(1, desc == "" and 0.5 or 0),
         ZIndex = 55,
         AutoButtonColor = false,
     })
@@ -2686,8 +2686,8 @@ end
         pickerDialog = Create("Frame", {
             BackgroundColor3 = theme.CardBg,
             BackgroundTransparency = CardAlpha(self.Window.Transparent) - 0.2,
-            Size = UDim2.new(0, 300, 0, showAlpha and 380 : 340),
-            Position = UDim2.new(0.5, -150, 0.5, showAlpha and -190 : -170),
+            Size = UDim2.new(0, 300, 0, showAlpha and 380 or 340),
+            Position = UDim2.new(0.5, -150, 0.5, showAlpha and -190 or -170),
             AnchorPoint = Vector2.new(0.5, 0.5),
             ZIndex = 999,
         })
@@ -2832,7 +2832,7 @@ end
 
         -- Animate in
         pickerDialog.Size = UDim2.new(0, 0, 0, 0)
-        Ease(pickerDialog, { Size = UDim2.new(0, 300, 0, showAlpha and 380 : 340) }, 0.2)
+        Ease(pickerDialog, { Size = UDim2.new(0, 300, 0, showAlpha and 380 or 340) }, 0.2)
     end
 
     colorPreview.MouseButton1Click:Connect(function()
